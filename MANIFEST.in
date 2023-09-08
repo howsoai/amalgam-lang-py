@@ -1,0 +1,8 @@
+include *.md
+include *.json
+include LICENSE.txt
+global-include *.so
+global-include *.dylib
+global-include *.dll
+global-exclude *.py[co]
+prune **/test

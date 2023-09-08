@@ -1,0 +1,179 @@
+name: Reusable WF - Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+
+  pepify:
+    uses: "./.github/workflows/pepify.yml"
+    with:
+      version: ${{ inputs.version }}
+
+  build:
+    name: Build (${{ matrix.plat }})
+    needs: ["pepify"]
+    runs-on: ubuntu-latest
+    outputs:
+      amalgam-version: ${{ steps.get-amalgam-version.outputs.amalgam-version }}
+    strategy:
+      matrix:
+        plat: [manylinux_2_29_x86_64, manylinux_2_29_aarch64, macosx_11_0_x86_64, macosx_11_0_arm64, win_amd64, any]
+
+    steps:
+
+    - uses: actions/checkout@v3
+
+    - name: Get Amalgam dependency version
+      id: get-amalgam-version
+      shell: bash
+      run: |
+        AMALGAM_VERSION=$(jq -r ".dependencies.amalgam" ./version.json)
+        echo "amalgam-version=$(echo $AMALGAM_VERSION)" >> $GITHUB_OUTPUT
+        echo "AMALGAM_VERSION=$(echo $AMALGAM_VERSION)" >> $GITHUB_ENV
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.8"
+
+    - name: Install cibuildwheel
+      run: >-
+        python3 -m
+        pip install
+        cibuildwheel==2.15.0
+        build
+
+    - name: Download Amalgam linux-amd64
+      if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*linux-amd64*"
+        extract: true
+        out-file-path: "amalgam/lib/linux/amd64"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Download Amalgam linux-arm64
+      if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*linux-arm64.tar.gz"
+        extract: true
+        out-file-path: "amalgam/lib/linux/arm64"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Download Amalgam linux-arm64_8a
+      if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*linux-arm64_8a*"
+        extract: true
+        out-file-path: "amalgam/lib/linux/arm64_8a"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Download Amalgam darwin-amd64
+      if: matrix.plat == 'macosx_11_0_x86_64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*darwin-amd64*"
+        extract: true
+        out-file-path: "amalgam/lib/darwin/amd64"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Download Amalgam darwin-arm64
+      if: matrix.plat == 'macosx_11_0_arm64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*darwin-arm64*"
+        extract: true
+        out-file-path: "amalgam/lib/darwin/arm64"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Download Amalgam windows-amd64
+      if: matrix.plat == 'win_amd64' || matrix.plat == 'any'
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: "howsoai/amalgam"
+        tag: ${{ env.AMALGAM_VERSION }}
+        fileName: "*windows-amd64*"
+        extract: true
+        out-file-path: "amalgam/lib/windows/amd64"
+        token: ${{ secrets.TEMP_PAT }}
+
+    - name: Clean up dir
+      run: |
+        pwd
+        cd amalgam/lib
+        find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
+
+    - name: Build wheels
+      run: |
+        python3 -m build --wheel --outdir wheelhouse/ .
+        mkdir -p dist/
+        mv wheelhouse/*.whl dist/amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}.whl
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.pepify.outputs.pepified-version }}
+
+    - name: Build tarball
+      if: matrix.plat == 'any'
+      run: |
+        python3 -m build --sdist --outdir dist/ .
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.pepify.outputs.pepified-version }}
+
+    - name: Upload Tarball Artifact
+      if: matrix.plat == 'any'
+      uses: actions/upload-artifact@v3
+      with:
+        name: amalgam-lang-${{ needs.pepify.outputs.pepified-version }}.tar.gz
+        path: dist/amalgam-lang-*.tar.gz
+        if-no-files-found: error
+
+    - name: Upload Wheel Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}.whl
+        path: dist/amalgam_lang-*.whl
+        if-no-files-found: error
+
+  test-3-8:
+    needs: ["build"]
+    uses: "./.github/workflows/pytest.yml"
+    secrets: inherit
+    with:
+      python-version: "3.8"
+
+  test-3-9:
+    needs: ["build"]
+    uses: "./.github/workflows/pytest.yml"
+    secrets: inherit
+    with:
+      python-version: "3.9"
+
+  test-3-10:
+    needs: ["build"]
+    uses: "./.github/workflows/pytest.yml"
+    secrets: inherit
+    with:
+      python-version: "3.10"
+
+  test-3-11:
+    needs: ["build"]
+    uses: "./.github/workflows/pytest.yml"
+    secrets: inherit
+    with:
+      python-version: "3.11"

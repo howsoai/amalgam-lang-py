@@ -1,0 +1,25 @@
+# Variables to control the shared azure devops pipeline templates
+variables:
+  # Project variables
+  package: 'amalgam' # This needs to be the directory, under which the (primary) package lives
+  sourcesRoot: 'amalgam' # This needs to be the directory, under which your source code lives
+  module: 'amalgam-lang' # The module name (name param in setup.py)
+  # Build logic variables
+  pythonVersionJfrog: 3.9 # The python version to use for tracking module dependencies in jfrog
+  skipChangelogCheck: True # Will check for 'TODO' in changlog - likely added by template, indicating missed update
+  allBuildsAreChanges: True # Skips logic which isolates source code changes, from other changes
+  skipUnitTests: False # If you have a good reason to do so
+  checkLicenses: False # Uses license_finder to check for unapproved licenses
+  publishLicenses: False # (requires checkLicenses to be True, and a build to be published) Include LICENSE-3RD-PARTY.txt in packaged artifacts - for release branches, will commit back to branch
+  publishDevReleases: True # Create build in vpypi-dev for non release branches
+  commitDevVersionChange: False # Commit back to git, non release version changes (i.e. in __init__.py)
+  allowXrayBuildFailures: False # Configure if XRay can fail builds on issue detection
+  runXrayBuildScan: False # Configure if XRay scan is run after publishing the build
+  publishTracefiles: False # Publish the traces directory - conventionally will be setup to include the .trace file output during tests
+  buildQualityCoverageMustImprove: False # Forces build issues unless coverage has improved (up to threshold)
+  buildQualityWarningsMustGoDown: False # Forces build issues unless warnings have gone down
+  allowBuildQualityToFailBuild: False # Build quality issues will fail build (rather than warn about issues)
+  buildQualityRunPylint: False # Run pylint and collect issues
+  buildQualityRunFlake8: True # Run flake8 and collext issues
+  buildQualityCheckCoverage: True # Check code coverage in builds
+  buildQualityCheckWarnings: True # Check warnings in builds

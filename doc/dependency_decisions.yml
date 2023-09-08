@@ -1,0 +1,10 @@
+# File used by license finder for checking approved licenses
+---
+- - :inherit_from
+  - "../license-list/doc/dependency_decisions.yml"
+- - :approve
+  - chardet
+  - :who: support@howso.com
+    :why: 'Acceptible use, and not distributed in any case'
+    :versions: [3.0.4]
+    :when: 2020-08-02 15:07:10.037495800 Z

@@ -1,0 +1,40 @@
+# InteliJ/Pycharm
+.idea
+
+# Generated Eggs
+*.egg-info
+
+# OS Specific
+.DS_Store
+**/.DS_Store
+
+# Python Binaries
+*.py[oc]
+.cache/
+
+#Building
+build/
+dist/
+
+# IDE/Localconfig
+.direnv
+.envrc
+.vscode
+local/
+.python-version
+
+# Testing
+htmlcov
+**junit**
+.coverage
+coverage.xml
+
+# Execution trace files
+traces/
+*.trace
+
+# License tools
+lf_logs
+
+# Project specific
+lib

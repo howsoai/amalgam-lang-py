@@ -1,0 +1,56 @@
+name: Run Python Unit Tests
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        required: true
+        type: string
+
+jobs:
+
+  test:
+    name: Pytest (${{ inputs.python-version }})
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Get Amalgam dependency version
+        shell: bash
+        run: |
+          AMALGAM_VERSION=$(jq -r ".dependencies.amalgam" ./version.json)
+          echo "AMALGAM_VERSION=$(echo $AMALGAM_VERSION)" >> $GITHUB_ENV
+
+      - name: Download Amalgam linux-amd64
+        uses: robinraju/release-downloader@v1.8
+        with:
+          repository: "howsoai/amalgam"
+          tag: ${{ env.AMALGAM_VERSION }}
+          fileName: "*linux-amd64*"
+          extract: true
+          out-file-path: "amalgam/lib/linux/amd64"
+          token: ${{ secrets.TEMP_PAT }}
+
+      - name: Clean up dir
+        run: |
+          pwd
+          cd amalgam/lib
+          find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Run unit tests
+        run: |
+          python --version
+          pip install -e ".[dev]"
+          loglevel=${1:-INFO}
+          source_root_dir="amalgam"
+          pytest -s --log-cli-level=${loglevel} -o junit_family=xunit2 --cov-report term --cov=${source_root_dir} --junitxml=junit/test-results.xml --cov-report=xml
+
+      - name: Run flake8 linter
+        run: |
+          flake8 --exit-zero --format='##vso[task.logissue linenumber=%(row)d;columnnumber=%(col)d;code=%(code)s;sourcepath=%(path)s;type=warning;]%(text)s' ${source_root_dir}
