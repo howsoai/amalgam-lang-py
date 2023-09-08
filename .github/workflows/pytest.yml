@@ -1,4 +1,4 @@
-name: Run Python Unit Tests
+name: Reusable WF - Pytests
 
 on:
   workflow_call:
