@@ -30,7 +30,6 @@ jobs:
           fileName: "*linux-amd64*"
           extract: true
           out-file-path: "amalgam/lib/linux/amd64"
-          token: ${{ secrets.TEMP_PAT }}
 
       - name: Clean up dir
         run: |
