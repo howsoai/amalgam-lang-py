@@ -64,7 +64,3 @@ amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 ## Contributing
 
 [Contributing](CONTRIBUTING.md)
-
-## Support
-
-For questions or support, please email support@howso.com.
