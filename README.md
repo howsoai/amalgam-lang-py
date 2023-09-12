@@ -1,7 +1,7 @@
 # Amalgam&trade;
 
 
-Amalgam&trade; is a domain specific language ([DSL](https://en.wikipedia.org/wiki/Domain-specific_language)) developed primarily for [genetic programming](https://en.wikipedia.org/wiki/Generic_programming) and [instance based machine learning](https://en.wikipedia.org/wiki/Instance-based_learning), but also for simulation, agent based modeling, data storage and retrieval, the mathematics of probability theory and information theory, and game content and AI. The language format is somewhat LISP-like in that it uses parenthesized list format with prefix notation and is geared toward functional programming, where there is a one-to-one mapping between the code and the corresponding parse tree.
+Amalgam&trade; is a domain specific language ([DSL](https://en.wikipedia.org/wiki/Domain-specific_language)) developed primarily for [genetic programming](https://en.wikipedia.org/wiki/Generic_programming) and [instance based machine learning](https://en.wikipedia.org/wiki/Instance-based_learning), but also for simulation, agent based modeling, data storage and retrieval, the mathematics of probability theory and information theory, and game content and AI. The language format is somewhat LISP-like in that it uses parenthesized list format with prefix notation and is geared toward functional programming, where there is a one-to-one mapping between the code and the corresponding parse tree. The [Howso Engine](https://github.com/howsoai/howso-engine/tree/main) is an example of a program written in Amalgam.
 
 
 ## Resources
