@@ -111,7 +111,9 @@ jobs:
     - name: Clean up dir
       run: |
         pwd
+        cp version.json amalgam/lib/version.json
         cd amalgam/lib
+        sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
     - name: Build wheels
