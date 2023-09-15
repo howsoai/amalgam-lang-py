@@ -1,6 +1,6 @@
 include *.md
-include *.json
 include LICENSE.txt
+global-include *.json
 global-include *.so
 global-include *.dylib
 global-include *.dll
