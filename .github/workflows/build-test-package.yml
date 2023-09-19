@@ -63,7 +63,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64" "${{ needs.get-dependency-details.outputs.run-id }}"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -72,7 +72,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64.tar.gz" "${{ needs.get-dependency-details.outputs.run-id }}"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
