@@ -6,8 +6,19 @@ on:
       version:
         required: true
         type: string
+      payload:
+        required: false
+        type: string
 
 jobs:
+
+  get-dependency-details:
+    uses: "./.github/workflows/get-dependency-details.yml"
+    secrets: inherit
+    with:
+      owner: "apbassett"
+      repo: "amalgam"
+      payload: "${{ inputs.payload }}"
 
   pepify:
     uses: "./.github/workflows/pepify.yml"
@@ -16,10 +27,8 @@ jobs:
 
   build:
     name: Build (${{ matrix.plat }})
-    needs: ["pepify"]
+    needs: ["get-dependency-details", "pepify"]
     runs-on: ubuntu-latest
-    outputs:
-      amalgam-version: ${{ steps.get-amalgam-version.outputs.amalgam-version }}
     strategy:
       matrix:
         plat: [manylinux_2_29_x86_64, manylinux_2_29_aarch64, macosx_11_0_x86_64, macosx_11_0_arm64, win_amd64, any]
@@ -27,14 +36,6 @@ jobs:
     steps:
 
     - uses: actions/checkout@v3
-
-    - name: Get Amalgam dependency version
-      id: get-amalgam-version
-      shell: bash
-      run: |
-        AMALGAM_VERSION=$(jq -r ".dependencies.amalgam" ./version.json)
-        echo "amalgam-version=$(echo $AMALGAM_VERSION)" >> $GITHUB_OUTPUT
-        echo "AMALGAM_VERSION=$(echo $AMALGAM_VERSION)" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -50,63 +51,66 @@ jobs:
 
     - name: Download Amalgam linux-amd64
       if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*linux-amd64*"
-        extract: true
-        out-file-path: "amalgam/lib/linux/amd64"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/amd64 -R "apbassett/amalgam" -p "*linux-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/linux/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
-    - name: Download Amalgam linux-arm64
-      if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*linux-arm64.tar.gz"
-        extract: true
-        out-file-path: "amalgam/lib/linux/arm64"
+    - name: Download Amalgam linux-arm64 [run]
+      if: (matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any') && needs.get-dependency-details.outputs.run-type == 'run'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "apbassett/amalgam" -p "*linux-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
+
+    - name: Download Amalgam linux-arm64 [release]
+      if: (matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any') && needs.get-dependency-details.outputs.run-type == 'release'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "apbassett/amalgam" -p "*linux-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam linux-arm64_8a
       if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*linux-arm64_8a*"
-        extract: true
-        out-file-path: "amalgam/lib/linux/arm64_8a"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64_8a -R "apbassett/amalgam" -p "*linux-arm64_8a*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/linux/arm64_8a && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam darwin-amd64
       if: matrix.plat == 'macosx_11_0_x86_64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*darwin-amd64*"
-        extract: true
-        out-file-path: "amalgam/lib/darwin/amd64"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/darwin/amd64 -R "apbassett/amalgam" -p "*darwin-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/darwin/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam darwin-arm64
       if: matrix.plat == 'macosx_11_0_arm64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*darwin-arm64*"
-        extract: true
-        out-file-path: "amalgam/lib/darwin/arm64"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/darwin/arm64 -R "apbassett/amalgam" -p "*darwin-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/darwin/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam windows-amd64
       if: matrix.plat == 'win_amd64' || matrix.plat == 'any'
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "howsoai/amalgam"
-        tag: ${{ env.AMALGAM_VERSION }}
-        fileName: "*windows-amd64*"
-        extract: true
-        out-file-path: "amalgam/lib/windows/amd64"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/windows/amd64 -R "apbassett/amalgam" -p "*windows-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Clean up dir
       run: |
