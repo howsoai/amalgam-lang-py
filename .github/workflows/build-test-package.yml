@@ -139,14 +139,14 @@ jobs:
       if: matrix.plat == 'any'
       uses: actions/upload-artifact@v3
       with:
-        name: amalgam-lang-${{ needs.pepify.outputs.pepified-version }}.tar.gz
+        name: amalgam-lang-${{ needs.pepify.outputs.pepified-version }}
         path: dist/amalgam-lang-*.tar.gz
         if-no-files-found: error
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}.whl
+        name: amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}
         path: dist/amalgam_lang-*.whl
         if-no-files-found: error
 
