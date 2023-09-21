@@ -79,6 +79,7 @@ class Amalgam:
         self,
         library_path: Optional[Union[Path, str]] = None,
         *,
+        arch: Optional[str] = None,
         append_trace_file: bool = False,
         execution_trace_dir: Optional[str] = None,
         execution_trace_file: str = "execution.trace",
@@ -96,7 +97,7 @@ class Amalgam:
 
         # Work out path and postfix of the library from the given parameters.
         self.library_path, self.library_postfix = self._get_library_path(
-            library_path, library_postfix)
+            library_path, library_postfix, arch)
 
         self.append_trace_file = append_trace_file
         if trace:
@@ -156,7 +157,8 @@ class Amalgam:
     def _get_library_path(
         self,
         library_path: Optional[Union[Path, str]] = None,
-        library_postfix: str = '-mt'
+        library_postfix: Optional[str] = '-mt',
+        arch: Optional[str] = None
     ) -> Tuple[Path, str]:
         """
         Return the full Amalgam library path and its library_postfix.
@@ -173,6 +175,10 @@ class Amalgam:
             Optional, The library type as specified by a postfix to the word
             "amalgam" in the library's filename. E.g., the "-mt" in
             `amalgam-mt.dll`.
+        arch: str, default None
+            Optional, the platform architecture of the embedded Amalgam
+            library. If not provided, it will be automatically detected.
+            (Note: arm64_8a architecture must be manually specified!)
 
         Returns
         -------
@@ -220,18 +226,21 @@ class Amalgam:
                     'specify the `library_path` to the Amalgam shared library '
                     'to use with this platform.')
 
-            arch = platform.machine().lower()
+            if not arch:
+                arch = platform.machine().lower()
 
-            if arch in ['x86_64', 'amd64']:
-                path_arch = 'amd64'
-            elif arch.startswith('aarch64') or arch.startswith('arm64'):
-                # see: https://stackoverflow.com/q/45125516/440805
-                path_arch = 'arm64'
-            else:
+                if arch == 'x86_64':
+                    arch = 'amd64'
+                elif arch.startswith('aarch64') or arch.startswith('arm64'):
+                    # see: https://stackoverflow.com/q/45125516/440805
+                    arch = 'arm64'
+
+            if arch not in ['amd64', 'arm64', 'arm64_8a']:
                 raise RuntimeError(
-                    'Detected an unsupported machine architecture. Please '
-                    'specify the `library_path` to the Amalgam shared library '
-                    'to use with this machine architecture.')
+                    'An unsupported machine architecture was detected or '
+                    'provided. Please specify the `library_path` to the '
+                    'Amalgam shared library to use with this machine '
+                    'architecture.')
 
             if not library_postfix:
                 library_postfix = '-mt'
@@ -240,7 +249,7 @@ class Amalgam:
             lib_root = Path(Path(__file__).parent, 'lib')
 
             # Build path
-            library_path = Path(lib_root, path_os, path_arch,
+            library_path = Path(lib_root, path_os, arch,
                                 f'amalgam{library_postfix}.{path_ext}')
 
         return library_path, library_postfix
