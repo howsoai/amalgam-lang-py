@@ -133,19 +133,6 @@ class Amalgam:
             self.trace = None
 
         _logger.debug(f"Loading amalgam library: {self.library_path}")
-        if not self.library_path.exists():
-            if library_path:
-                raise FileNotFoundError(
-                    'No Amalgam library was found at the provided '
-                    '`library_path`. Please check that the path is correct.'
-                )
-            else:
-                raise FileNotFoundError(
-                    'The auto-determined Amalgam binary to use was not found. '
-                    'This could indicate that the combination of operating '
-                    'system, machine architecture and library-postfix is not '
-                    'yet supported.'
-                )
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
         self.amlg = cdll.LoadLibrary(str(self.library_path))
         self.set_amlg_flags(sbf_datastore_enabled)
@@ -154,10 +141,54 @@ class Amalgam:
         self.op_count = 0
         self.load_command_log_entry = None
 
+    @classmethod
+    def _get_allowed_postfixes(cls, library_dir: Path) -> List[str]:
+        """
+        Return list of all library postfixes allowed given library directory.
+
+        Parameters
+        ----------
+        library_dir : Path
+            The path object to the library directory.
+
+        Returns
+        -------
+        list of str
+            The allowed library postfixes.
+        """
+        allowed_postfixes = set()
+        for file in library_dir.glob("amalgam*"):
+            postfix = cls._parse_postfix(file.name)
+            if postfix is not None:
+                allowed_postfixes.add(postfix)
+        return list(allowed_postfixes)
+
+    @classmethod
+    def _parse_postfix(cls, filename: str) -> Union[str, None]:
+        """
+        Determine library postfix given a filename.
+
+        Parameters
+        ----------
+        filename : str
+            The filename to parse.
+
+        Returns
+        -------
+        str or None
+            The library postfix of the filename, or None if no postfix.
+        """
+        matches = re.findall(r'-(.+?)\.', filename)
+        if len(matches) > 0:
+            return f'-{matches[-1]}'
+        else:
+            return None
+
+    @classmethod
     def _get_library_path(
-        self,
+        cls,
         library_path: Optional[Union[Path, str]] = None,
-        library_postfix: Optional[str] = '-mt',
+        library_postfix: Optional[str] = None,
         arch: Optional[str] = None
     ) -> Tuple[Path, str]:
         """
@@ -175,7 +206,7 @@ class Amalgam:
             Optional, The library type as specified by a postfix to the word
             "amalgam" in the library's filename. E.g., the "-mt" in
             `amalgam-mt.dll`.
-        arch: str, default None
+        arch : str, default None
             Optional, the platform architecture of the embedded Amalgam
             library. If not provided, it will be automatically detected.
             (Note: arm64_8a architecture must be manually specified!)
@@ -185,17 +216,20 @@ class Amalgam:
         Path
             The path to the appropriate Amalgam shared lib (.dll, .so, .dylib).
         str
-            The library prefix
+            The library postfix.
         """
+        if library_postfix and not library_postfix.startswith("-"):
+            # Library postfix must start with a dash
+            raise ValueError(
+                f'The provided `library_postfix` value of "{library_postfix}" '
+                'must start with a "-".'
+            )
+
         if library_path:
             # Find the library postfix, if one is present in the given
             # library_path.
             filename = Path(library_path).name
-            matches = re.findall(r'-(.+?)\.', filename)
-            if len(matches) > 0:
-                _library_postfix = f'-{matches[-1]}'
-            else:
-                _library_postfix = None
+            _library_postfix = cls._parse_postfix(filename)
             if library_postfix and library_postfix != _library_postfix:
                 warnings.warn(
                     'The supplied `library_postfix` does not match the '
@@ -203,29 +237,21 @@ class Amalgam:
                     UserWarning
                 )
             library_postfix = _library_postfix
-
             library_path = Path(library_path).expanduser()
+
+            if not library_path.exists():
+                raise FileNotFoundError(
+                    'No Amalgam library was found at the provided '
+                    f'`library_path`: "{library_path}". Please check that the '
+                    'path is correct.'
+                )
         else:
             # No library_path was provided so, auto-determine the correct one
             # to use for this running environment. For this, the operating
             # system, the machine architecture and postfix are used.
             os = platform.system().lower()
 
-            if os == 'windows':
-                path_os = 'windows'
-                path_ext = 'dll'
-            elif os == "darwin":
-                path_os = 'darwin'
-                path_ext = 'dylib'
-            elif os == "linux":
-                path_os = 'linux'
-                path_ext = 'so'
-            else:
-                raise RuntimeError(
-                    'Detected an unsupported machine platform type. Please '
-                    'specify the `library_path` to the Amalgam shared library '
-                    'to use with this platform.')
-
+            arch_supported = False
             if not arch:
                 arch = platform.machine().lower()
 
@@ -235,22 +261,62 @@ class Amalgam:
                     # see: https://stackoverflow.com/q/45125516/440805
                     arch = 'arm64'
 
-            if arch not in ['amd64', 'arm64', 'arm64_8a']:
+            if os == 'windows':
+                path_os = 'windows'
+                path_ext = 'dll'
+                arch_supported = arch in ['amd64']
+            elif os == "darwin":
+                path_os = 'darwin'
+                path_ext = 'dylib'
+                arch_supported = arch in ['amd64', 'arm64']
+            elif os == "linux":
+                path_os = 'linux'
+                path_ext = 'so'
+                arch_supported = arch in ['amd64', 'arm64', 'arm64_8a']
+            else:
                 raise RuntimeError(
-                    'An unsupported machine architecture was detected or '
-                    'provided. Please specify the `library_path` to the '
-                    'Amalgam shared library to use with this machine '
+                    f'Detected an unsupported machine platform type "{os}". '
+                    'Please specify the `library_path` to the Amalgam shared '
+                    'library to use with this platform.')
+
+            if not arch_supported:
+                raise RuntimeError(
+                    f'An unsupported machine architecture "{arch}" was '
+                    'detected or provided. Please specify the `library_path` '
+                    'to the Amalgam shared library to use with this machine '
                     'architecture.')
 
             if not library_postfix:
-                library_postfix = '-mt'
+                library_postfix = '-mt' if arch != "arm64_8a" else '-st'
 
             # Default path for Amalgam binary should be at <package_root>/lib
             lib_root = Path(Path(__file__).parent, 'lib')
 
             # Build path
-            library_path = Path(lib_root, path_os, arch,
-                                f'amalgam{library_postfix}.{path_ext}')
+            dir_path = Path(lib_root, path_os, arch)
+            filename = f'amalgam{library_postfix}.{path_ext}'
+            library_path = Path(dir_path, filename)
+
+            if not library_path.exists():
+                # First check if invalid postfix, otherwise show generic error
+                allowed_postfixes = cls._get_allowed_postfixes(dir_path)
+                _library_postfix = cls._parse_postfix(filename)
+                if (
+                    allowed_postfixes and
+                    _library_postfix not in allowed_postfixes
+                ):
+                    raise RuntimeError(
+                        'An unsupported `library_postfix` value of '
+                        f'"{_library_postfix}" was provided. Supported options '
+                        "for your machine's platform and architecture include: "
+                        f'{", ".join(allowed_postfixes)}.'
+                    )
+                raise FileNotFoundError(
+                    'The auto-determined Amalgam library to use was not found '
+                    f'at "{library_path}". This could indicate that the '
+                    'combination of operating system, machine architecture and '
+                    'library-postfix is not yet supported.'
+                )
 
         return library_path, library_postfix
 
