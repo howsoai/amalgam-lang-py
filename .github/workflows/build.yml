@@ -9,6 +9,9 @@ on:
       payload:
         required: false
         type: string
+      build-type:
+        required: false
+        type: string
 
 jobs:
 
@@ -120,6 +123,14 @@ jobs:
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
+    - name: Set workflow run info
+      if: needs.get-dependency-details.outputs.build-date != ''
+      run: |
+        cd amalgam/lib
+        jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
+        jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
+        cat version.json
+
     - name: Build wheels
       run: |
         python3 -m build --wheel --outdir wheelhouse/ .
@@ -150,6 +161,14 @@ jobs:
         path: dist/amalgam_lang-*.whl
         if-no-files-found: error
 
+  workflow-summary:
+    needs: ["build"]
+    uses: "./.github/workflows/workflow-summary.yml"
+    secrets: inherit
+    with:
+      payload: "${{ inputs.payload }}"
+      build-type: "${{ inputs.build-type }}"
+    
   test-3-8:
     needs: ["build"]
     uses: "./.github/workflows/pytest.yml"
@@ -177,3 +196,49 @@ jobs:
     secrets: inherit
     with:
       python-version: "3.11"
+
+  create-release:
+    if: inputs.build-type == 'release'
+    needs: ['build', 'test-3-8', 'test-3-9', 'test-3-10', 'test-3-11']
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./tmp
+
+      - name: Clean up dir
+        run: |
+          mkdir -p dist
+          find ./tmp -type f -name '*.whl' -exec mv -t ./dist {} +
+          find ./tmp -type f -name '*.tar.gz' -exec mv -t ./dist {} +
+          ls ./dist
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ inputs.version }}
+          commit: ${{ github.sha }}
+          name: "amalgam-lang-py ${{ inputs.version }}"
+          artifactErrorsFailBuild: true
+          generateReleaseNotes: true
+          makeLatest: legacy
+          artifacts: "dist/*"
+          artifactContentType: application/gzip
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
