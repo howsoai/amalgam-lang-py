@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plat: [manylinux_2_29_x86_64, manylinux_2_29_aarch64, macosx_11_0_x86_64, macosx_11_0_arm64, win_amd64, any]
+        plat: [manylinux_2_29_x86_64, manylinux_2_29_aarch64, macosx_12_0_x86_64, macosx_12_0_arm64, win_amd64, any]
 
     steps:
 
@@ -89,7 +89,7 @@ jobs:
         cd amalgam/lib/linux/arm64_8a && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam darwin-amd64
-      if: matrix.plat == 'macosx_11_0_x86_64' || matrix.plat == 'any'
+      if: matrix.plat == 'macosx_12_0_x86_64' || matrix.plat == 'any'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -98,7 +98,7 @@ jobs:
         cd amalgam/lib/darwin/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam darwin-arm64
-      if: matrix.plat == 'macosx_11_0_arm64' || matrix.plat == 'any'
+      if: matrix.plat == 'macosx_12_0_arm64' || matrix.plat == 'any'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
