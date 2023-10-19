@@ -49,7 +49,7 @@ jobs:
           if [[ $(cat $site_packages/amalgam/lib/version.json | jq '.version | has("amalgam_build_date")') == true ]]; then
             # Get amalgam build title and date
             build_date=$(jq -r '.version."amalgam_build_date"' $site_packages/amalgam/lib/version.json)
-            build_date=$(python -c "from datetime import datetime; print(datetime.strptime($build_date, '%Y-%m-%dT%H:%M:%SZ').strftime('%A, %B %d, %I:%M %p'))")
+            build_date=$(python -c "from datetime import datetime; print(datetime.strptime('$build_date', '%Y-%m-%dT%H:%M:%SZ').strftime('%A, %B %d, %I:%M %p'))")
             amlg_version=$(jq -r '.version."amalgam_display_title"' $site_packages/amalgam/lib/version.json)
             amlg_version=$(echo "$amlg_version ($build_date)")
             amlg_notes=$(echo "Prerelease version")
