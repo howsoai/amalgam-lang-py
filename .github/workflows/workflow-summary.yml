@@ -46,21 +46,26 @@ jobs:
 
           site_packages=$(python -m site --user-site)
 
+          # Get version, commit SHA, and workflow/release URL
+          amlg_version=$(jq -r '.version.amalgam' $site_packages/amalgam/lib/version.json)
+          amlg_sha=$(jq -r '.version."amalgam_sha"' $site_packages/amalgam/lib/version.json)
+          amlg_url=$(jq -r '.version."amalgam_url"' $site_packages/amalgam/lib/version.json)
+
           if [[ $(cat $site_packages/amalgam/lib/version.json | jq '.version | has("amalgam_build_date")') == true ]]; then
-            # Get amalgam build title and date
+            # Get amalgam prerelease info (workflow run)
             build_date=$(jq -r '.version."amalgam_build_date"' $site_packages/amalgam/lib/version.json)
             build_date=$(python -c "from datetime import datetime; print(datetime.strptime('$build_date', '%Y-%m-%dT%H:%M:%SZ').strftime('%A, %B %d, %I:%M %p'))")
-            amlg_version=$(jq -r '.version."amalgam_display_title"' $site_packages/amalgam/lib/version.json)
+            amlg_notes=$(jq -r '.version."amalgam_display_title"' $site_packages/amalgam/lib/version.json)
             amlg_version=$(echo "$amlg_version ($build_date)")
-            amlg_notes=$(echo "Prerelease version")
           else
-            # Get amalgam release version
-            amlg_version=$(jq -r '.version.amalgam' $site_packages/amalgam/lib/version.json)
+            # Get amalgam release info
             amlg_notes=$(echo "Release version specified in \`version.json\`")
           fi
-          # amalgam notes
+          # Substitute info into version_summary.md
           sed -i "s|{amalgam-version}|$amlg_version|g" ./.github/templates/version_summary.md
           sed -i "s|{amalgam-notes}|$amlg_notes|g" ./.github/templates/version_summary.md
+          sed -i "s|{amalgam-sha}|$amlg_sha|g" ./.github/templates/version_summary.md
+          sed -i "s|{amalgam-url}|$amlg_url|g" ./.github/templates/version_summary.md
           # Remove unecessary quotations from variable substitutions
           sed -i "s|\"||g" ./.github/templates/version_summary.md
           # Output filled template file to workflow summary

@@ -115,20 +115,39 @@ jobs:
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
-    - name: Clean up dir
+    - name: Clean up dir (plat-specific)
+      if: matrix.plat != 'any'
       run: |
-        pwd
         cp version.json amalgam/lib/version.json
         cd amalgam/lib
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
-    - name: Set workflow run info
-      if: needs.get-dependency-details.outputs.build-date != ''
+    - name: Clean up dir (all plats)
+      if: matrix.plat == 'any'
+      run: |
+        cp version.json amalgam/lib/version.json
+        cd amalgam/lib
+        cp linux/amd64/bin/amalgam-mt ~/amalgam-mt
+        sed -i 's/dependencies/version/g' version.json
+        find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
+
+    - name: Set amalgam version metadata
+      if: matrix.plat == 'any'
       run: |
         cd amalgam/lib
-        jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
-        jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
+        # Set the display title and build date info in version.json
+        if [[ -n '${{ needs.get-dependency-details.outputs.build-title }}' ]]; then
+          jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
+          jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
+          # Replace the release version with the downloaded prerelease version
+          pr_version=$(~/amalgam-mt --version | sed -n 's/Amalgam Version: \(.\)/\1/p')
+          echo "Found amalgam version: '$pr_version'"
+          jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
+          rm ~/amalgam-mt
+        fi
+        jq '.version |= . + {"amalgam_sha": ${{ needs.get-dependency-details.outputs.head-sha }}}' version.json > temp.json && mv temp.json version.json
+        jq '.version |= . + {"amalgam_url": ${{ needs.get-dependency-details.outputs.url }}}' version.json > temp.json && mv temp.json version.json
         cat version.json
 
     - name: Build wheels
