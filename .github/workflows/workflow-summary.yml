@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -56,6 +56,7 @@ jobs:
             build_date=$(jq -r '.version."amalgam_build_date"' $site_packages/amalgam/lib/version.json)
             build_date=$(python -c "from datetime import datetime; print(datetime.strptime('$build_date', '%Y-%m-%dT%H:%M:%SZ').strftime('%A, %B %d, %I:%M %p'))")
             amlg_notes=$(jq -r '.version."amalgam_display_title"' $site_packages/amalgam/lib/version.json)
+            amlg_notes=$(python -c "notes = '$amlg_notes'.split(' -')[0] if 'PR Build' in '$amlg_notes' else '$amlg_notes'; print(notes)")
             amlg_version=$(echo "$amlg_version ($build_date)")
           else
             # Get amalgam release info
