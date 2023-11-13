@@ -4,19 +4,14 @@ run-name: "Branch Build (${{ github.run_attempt }}.${{ github.run_number }}) - $
 on:
   workflow_dispatch:
     inputs:
-      payload:
+      amalgam-build:
         description: |
-          JSON payload containing extra info used by workflow.
-
-          For builds that have dependencies, key values of 'repo' => 'build-id' may
-          be used to define version. If blank or not supplied, latest tagged release
-          build will be used. Build ID may also be a release tag version.
-
-          Example:
-          {
-            "amalgam": "6191984493",
-            "howso-engine": "68.1.0"
-          }
+          (Optional) amalgam build or version number. Defaults to latest release.
+          
+          Examples:
+            '6807310618',
+            'https://github.com/howsoai/amalgam/actions/runs/6807310618',
+            '68.0.1'
         required: false
         type: string
 
@@ -58,13 +53,33 @@ jobs:
           BRANCH_ITERATION=${{ github.run_attempt }}.${{ github.run_number }}
           echo "version=$(echo ${{ steps.next-semvers.outputs.patch }}-alpha+BR.${{ github.ref_name }}.${BRANCH_ITERATION})" >> $GITHUB_OUTPUT
 
+  construct-payload:
+    runs-on: ubuntu-latest
+    outputs:
+      payload: ${{ steps.construct-payload.outputs.payload }}
+    steps:
+
+      - name: Construct payload
+        id: construct-payload
+        run: |
+          payload="{}"
+          # Get amalgam version or run ID
+          if [[ "${{ inputs.amalgam-build }}" =~ runs/([0-9]+) ]]; then
+            payload=$(echo "$payload" | jq --arg run_id "${BASH_REMATCH[1]}" '. + {"amalgam": $run_id}')
+          elif [[ -n "${{ inputs.amalgam-build }}" ]]; then
+            payload=$(echo "$payload" | jq --arg run_id "${{ inputs.amalgam-build }}" '. + {"amalgam": $run_id}')
+          fi
+          echo "$payload"
+          fmtd_payload=$(echo -n "$payload" | tr -d '\n')
+          echo "payload=$fmtd_payload" >> $GITHUB_OUTPUT
+
   build:
-    needs: ['set-branch-version']
+    needs: ['set-branch-version', 'construct-payload']
     uses: "./.github/workflows/build.yml"
     secrets: inherit
     with:
       version: ${{ needs.set-branch-version.outputs.version }}
-      payload: ${{ inputs.payload }}
+      payload: ${{ needs.construct-payload.outputs.payload }}
       build-type: 'branch'
 
   # This job is here to have only one final step to add for "Status Checks"

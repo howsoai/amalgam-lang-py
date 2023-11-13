@@ -48,6 +48,7 @@ jobs:
           pip install -e ".[dev]"
           loglevel=${1:-INFO}
           source_root_dir="amalgam"
+          pip list
           pytest -s --log-cli-level=${loglevel} -o junit_family=xunit2 --cov-report term --cov=${source_root_dir} --junitxml=junit/test-results.xml --cov-report=xml
 
       - name: Run flake8 linter
