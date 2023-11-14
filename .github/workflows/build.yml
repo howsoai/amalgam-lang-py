@@ -115,25 +115,23 @@ jobs:
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
-    - name: Clean up dir (plat-specific)
-      if: matrix.plat != 'any'
+    - name: Format lib dir and add workflow metadata
       run: |
         cp version.json amalgam/lib/version.json
         cd amalgam/lib
-        sed -i 's/dependencies/version/g' version.json
-        find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
-
-    - name: Clean up dir (all plats)
-      if: matrix.plat == 'any'
-      run: |
-        cp version.json amalgam/lib/version.json
-        cd amalgam/lib
-        cp linux/amd64/bin/amalgam-mt ~/amalgam-mt
+        if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
+          fp=$(find ./ -type f -name 'amalgam-mt.exe')
+        elif [[ "${{ matrix.plat }}" == 'any' ]]; then
+          fp="./linux/amd64/bin/amalgam-mt"
+        else
+          fp=$(find ./ -type f -name 'amalgam-mt')
+        fi
+        echo "Found amalgam-mt at: $fp"
+        cp $fp ~/amalgam-mt
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
     - name: Set amalgam version metadata
-      if: matrix.plat == 'any'
       run: |
         cd amalgam/lib
         # Set the display title and build date info in version.json
