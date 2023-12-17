@@ -51,9 +51,6 @@ repository = "https://github.com/howsoai/amalgam-lang-py"
 [tool.setuptools]
 packages = ["amalgam"]
 
-[tool.setuptools.dynamic]
-optional-dependencies.dev = { file = ["requirements-dev.in"]}
-
 [tool.isort]
 profile = "google"
 known_first_party = ["howso"]
