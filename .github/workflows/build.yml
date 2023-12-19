@@ -139,7 +139,7 @@ jobs:
           jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
           jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
           # Replace the release version with the downloaded prerelease version
-          pr_version=$(~/amalgam-mt --version | sed -n 's/Amalgam Version: \(.\)/\1/p')
+          pr_version=$(~/amalgam-mt --version)
           echo "Found amalgam version: '$pr_version'"
           jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
           rm ~/amalgam-mt
