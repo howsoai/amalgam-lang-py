@@ -127,7 +127,7 @@ jobs:
           fp=$(find ./ -type f -name 'amalgam-mt')
         fi
         echo "Found amalgam-mt at: $fp"
-        cp $fp ~/amalgam-mt
+        cp $fp ~/
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
@@ -142,7 +142,7 @@ jobs:
           pr_version=$(~/amalgam-mt --version)
           echo "Found amalgam version: '$pr_version'"
           jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
-          rm ~/amalgam-mt
+          rm ~/amalgam-mt*
         fi
         jq '.version |= . + {"amalgam_sha": ${{ needs.get-dependency-details.outputs.head-sha }}}' version.json > temp.json && mv temp.json version.json
         jq '.version |= . + {"amalgam_url": ${{ needs.get-dependency-details.outputs.url }}}' version.json > temp.json && mv temp.json version.json
@@ -185,7 +185,7 @@ jobs:
     with:
       payload: "${{ inputs.payload }}"
       build-type: "${{ inputs.build-type }}"
-    
+
   test-3-8:
     needs: ["build"]
     uses: "./.github/workflows/pytest.yml"
