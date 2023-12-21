@@ -128,7 +128,6 @@ jobs:
         fi
         echo "Found amalgam-mt at: $fp"
         cp $fp ~/
-        chmod +x ~/amalgam-mt*
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
@@ -136,21 +135,20 @@ jobs:
       run: |
         cd amalgam/lib
         # Set the display title and build date info in version.json
-        #if [[ -n '${{ needs.get-dependency-details.outputs.build-title }}' ]]; then
-        if true; then
-          if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
-            amlg="amalgam-mt.exe"
-          else
-            amlg="amalgam-mt"
-          fi
-          jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
-          jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
-          # Replace the release version with the downloaded prerelease version
-          pr_version=$(~/$amlg --version)
-          echo "Found amalgam version: '$pr_version'"
-          jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
-          rm ~/$amlg
-        fi
+
+        # Note: the below code has a few bugs in it. The main one being for non-amd64 platforms, this will not work because running the amalgam
+        #       binary requires emulation. There also seems to be another issue even on amd64 platforms and not being able to find or execute
+        #       the binary. Commenting out for now as the functionality is not required and only run on branch builds (a nice to have).
+        # if [[ -n '${{ needs.get-dependency-details.outputs.build-title }}' ]]; then
+        #   jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
+        #   jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
+        #   # Replace the release version with the downloaded prerelease version
+        #   pr_version=$(~/amalgam-mt --version)
+        #   echo "Found amalgam version: '$pr_version'"
+        #   jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
+        #   rm ~/amalgam-mt*
+        # fi
+
         jq '.version |= . + {"amalgam_sha": ${{ needs.get-dependency-details.outputs.head-sha }}}' version.json > temp.json && mv temp.json version.json
         jq '.version |= . + {"amalgam_url": ${{ needs.get-dependency-details.outputs.url }}}' version.json > temp.json && mv temp.json version.json
         cat version.json
