@@ -618,14 +618,14 @@ class Amalgam:
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        result = self.amlg.LoadEntity(
-            handle_buf, amlg_path_buf, persist, load_contained,
-            write_log_buf, print_log_buf)
         self.load_command_log_entry = (
-            f"LOAD_ENTITY {handle} {amlg_path} {str(persist).lower()} "
+            f"LOAD_ENTITY {handle} \"{amlg_path}\" {str(persist).lower()} "
             f"{str(load_contained).lower()} {write_log} {print_log}"
         )
         self._log_execution(self.load_command_log_entry)
+        result = self.amlg.LoadEntity(
+            handle_buf, amlg_path_buf, persist, load_contained,
+            write_log_buf, print_log_buf)
         self._log_reply(result)
         del handle_buf
         del amlg_path_buf
