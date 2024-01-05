@@ -1,4 +1,5 @@
-from pathlib import Path
+from pathlib import Path, WindowsPath
+from platform import system
 import pytest
 
 from amalgam import api
@@ -48,6 +49,9 @@ def test_amalgam_library_path_defaults(
     mocker.patch('amalgam.api.platform.system', return_value=platform)
     mocker.patch('amalgam.api.platform.machine', return_value=arch)
     mocker.patch('amalgam.api.Amalgam._get_allowed_postfixes', return_value=["-mt", "-st"])
+
+    if system() == 'Windows' and expected_path is not RuntimeError:
+        expected_path = str(WindowsPath(expected_path))
 
     try:
         amlg = amalgam_factory(library_path=None, library_postfix=postfix)

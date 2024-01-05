@@ -1,36 +1,45 @@
-name: Reusable WF - Build
+name: Build
+run-name: "Branch Build (${{ github.run_attempt }}.${{ github.run_number }}) - ${{ github.ref_name }}"
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      version:
-        required: true
-        type: string
-      payload:
+      amalgam-build:
+        description: |
+          (Optional) Amalgam build or version number. Defaults to pinned release.
+
+          Examples:
+            '6807310618',
+            'https://github.com/howsoai/amalgam/actions/runs/6807310618',
+            '57.0.1'
         required: false
         type: string
+  workflow_call:
+    inputs:
       build-type:
         required: false
         type: string
+      optional-release-tag:
+        required: false
+        type: string
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
 
-  get-dependency-details:
-    uses: "./.github/workflows/get-dependency-details.yml"
+  metadata:
+    uses: howsoai/.github/.github/workflows/set-metadata.yml@main
     secrets: inherit
     with:
-      owner: "howsoai"
-      repo: "amalgam"
-      payload: "${{ inputs.payload }}"
-
-  pepify:
-    uses: "./.github/workflows/pepify.yml"
-    with:
-      version: ${{ inputs.version }}
+      build-type: ${{ inputs.build-type }}
+      optional-release-tag: ${{ inputs.optional-release-tag }}
+      amalgam-build: ${{ inputs.amalgam-build }}
 
   build:
     name: Build (${{ matrix.plat }})
-    needs: ["get-dependency-details", "pepify"]
+    needs: ["metadata"]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -53,38 +62,24 @@ jobs:
         build
 
     - name: Download Amalgam linux-amd64
-      if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any'
+      if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any' || matrix.plat == 'manylinux_2_29_aarch64'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "*linux-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "*linux-amd64*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
-
-    - name: Download Amalgam linux-arm64 [run]
-      if: (matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any') && needs.get-dependency-details.outputs.run-type == 'run'
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64" "${{ needs.get-dependency-details.outputs.run-id }}"
-        # Needed because release/non-release downloads are different structure
-        cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
-
-    - name: Download Amalgam linux-arm64 [release]
-      if: (matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any') && needs.get-dependency-details.outputs.run-type == 'release'
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "*linux-arm64.tar.gz" "${{ needs.get-dependency-details.outputs.run-id }}"
-        # Needed because release/non-release downloads are different structure
-        cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam linux-arm64_8a
       if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/linux/arm64_8a -R "howsoai/amalgam" -p "*linux-arm64_8a*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        gh $run_type download -D amalgam/lib/linux/arm64_8a -R "howsoai/amalgam" -p "*linux-arm64_8a*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/arm64_8a && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -93,7 +88,9 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/darwin/amd64 -R "howsoai/amalgam" -p "*darwin-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        gh $run_type download -D amalgam/lib/darwin/amd64 -R "howsoai/amalgam" -p "*darwin-amd64*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/darwin/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -102,7 +99,9 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/darwin/arm64 -R "howsoai/amalgam" -p "*darwin-arm64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        gh $run_type download -D amalgam/lib/darwin/arm64 -R "howsoai/amalgam" -p "*darwin-arm64*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/darwin/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -111,7 +110,9 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh ${{ needs.get-dependency-details.outputs.run-type }} download -D amalgam/lib/windows/amd64 -R "howsoai/amalgam" -p "*windows-amd64*" "${{ needs.get-dependency-details.outputs.run-id }}"
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        gh $run_type download -D amalgam/lib/windows/amd64 -R "howsoai/amalgam" -p "*windows-amd64*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -134,94 +135,144 @@ jobs:
     - name: Set amalgam version metadata
       run: |
         cd amalgam/lib
-        # Set the display title and build date info in version.json
+        build_title=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".build_title')
+        build_date=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".build_date')
+        head_sha=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".head_sha')
+        url=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".url')
 
-        # Note: the below code has a few bugs in it. The main one being for non-amd64 platforms, this will not work because running the amalgam
-        #       binary requires emulation. There also seems to be another issue even on amd64 platforms and not being able to find or execute
-        #       the binary. Commenting out for now as the functionality is not required and only run on branch builds (a nice to have).
-        # if [[ -n '${{ needs.get-dependency-details.outputs.build-title }}' ]]; then
-        #   jq '.version |= . + {"amalgam_display_title": ${{ needs.get-dependency-details.outputs.build-title }}}' version.json > temp.json && mv temp.json version.json
-        #   jq '.version |= . + {"amalgam_build_date": ${{ needs.get-dependency-details.outputs.build-date }}}' version.json > temp.json && mv temp.json version.json
-        #   # Replace the release version with the downloaded prerelease version
-        #   pr_version=$(~/amalgam-mt --version)
-        #   echo "Found amalgam version: '$pr_version'"
-        #   jq --arg new_version "$pr_version" '.version.amalgam = $new_version' version.json > temp.json && mv temp.json version.json
-        #   rm ~/amalgam-mt*
-        # fi
-
-        jq '.version |= . + {"amalgam_sha": ${{ needs.get-dependency-details.outputs.head-sha }}}' version.json > temp.json && mv temp.json version.json
-        jq '.version |= . + {"amalgam_url": ${{ needs.get-dependency-details.outputs.url }}}' version.json > temp.json && mv temp.json version.json
+        jq --arg head_sha "$head_sha" '.version |= . + {"amalgam_sha": $head_sha}' version.json > temp.json && mv temp.json version.json
+        jq --arg url "$url" '.version |= . + {"amalgam_url": $url}' version.json > temp.json && mv temp.json version.json
+        jq --arg build_date "$build_date" '.version |= . + {"amalgam_build_date": $build_date}' version.json > temp.json && mv temp.json version.json
+        jq --arg build_title "$build_title" '.version |= . + {"amalgam_display_title": $display_title}' version.json > temp.json && mv temp.json version.json
         cat version.json
 
     - name: Build wheels
       run: |
         python3 -m build --wheel --outdir wheelhouse/ .
         mkdir -p dist/
-        mv wheelhouse/*.whl dist/amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}.whl
+        mv wheelhouse/*.whl dist/amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}.whl
       env:
-        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.pepify.outputs.pepified-version }}
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
 
     - name: Build tarball
       if: matrix.plat == 'any'
       run: |
         python3 -m build --sdist --outdir dist/ .
       env:
-        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.pepify.outputs.pepified-version }}
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
 
     - name: Upload Tarball Artifact
       if: matrix.plat == 'any'
       uses: actions/upload-artifact@v3
       with:
-        name: amalgam-lang-${{ needs.pepify.outputs.pepified-version }}
+        name: amalgam-lang-${{ needs.metadata.outputs.version }}
         path: dist/amalgam-lang-*.tar.gz
         if-no-files-found: error
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: amalgam_lang-${{ needs.pepify.outputs.pepified-version }}-py3-none-${{ matrix.plat }}
+        name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}
         path: dist/amalgam_lang-*.whl
         if-no-files-found: error
-
+  
   workflow-summary:
-    needs: ["build"]
-    uses: "./.github/workflows/workflow-summary.yml"
+    needs: ['metadata', 'build']
+    uses: "howsoai/.github/.github/workflows/workflow-summary.yml@main"
     secrets: inherit
     with:
-      payload: "${{ inputs.payload }}"
-      build-type: "${{ inputs.build-type }}"
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  test-3-8:
-    needs: ["build"]
-    uses: "./.github/workflows/pytest.yml"
+  pytest-linux-3-8-st:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
-      python-version: "3.8"
+      platform: 'howso-ubuntu-runner-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.8'
+      config-fp: './config/latest-st-debug-howso.yml'
+      config-pretty: 'ST'
+      workers: 'auto'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  test-3-9:
-    needs: ["build"]
-    uses: "./.github/workflows/pytest.yml"
+  pytest-linux-3-9-mt:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
-      python-version: "3.9"
+      platform: 'howso-ubuntu-runner-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.9'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  test-3-10:
-    needs: ["build"]
-    uses: "./.github/workflows/pytest.yml"
+  pytest-linux-3-10-mt:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
-      python-version: "3.10"
+      platform: 'howso-ubuntu-runner-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.10'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  test-3-11:
-    needs: ["build"]
-    uses: "./.github/workflows/pytest.yml"
+  pytest-linux-3-11-mt:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
-      python-version: "3.11"
+      platform: 'howso-ubuntu-runner-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.11'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  create-release:
+  pytest-windows-3-11-mt:
+    if: inputs.build-type != 'release'
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
+    secrets: inherit
+    with:
+      platform: 'howso-windows-runner-latest'
+      platform-pretty: 'Windows'
+      amalgam-plat-arch: 'windows-amd64'
+      python-version: '3.11'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+
+  pytest-macos-3-11-mt:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
+    secrets: inherit
+    with:
+      platform: 'macos-latest-xlarge'
+      platform-pretty: 'MacOS'
+      amalgam-plat-arch: 'darwin-arm64'
+      python-version: '3.11'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+
+  release:
     if: inputs.build-type == 'release'
-    needs: ['build', 'test-3-8', 'test-3-9', 'test-3-10', 'test-3-11']
+    needs:
+      - metadata
+      - pytest-linux-3-8-st
+      - pytest-linux-3-9-mt
+      - pytest-linux-3-10-mt
+      - pytest-linux-3-11-mt
+      - pytest-macos-3-11-mt
+      - pytest-windows-3-11-mt
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -248,9 +299,9 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ inputs.version }}
+          tag: ${{ needs.metadata.outputs.version }}
           commit: ${{ github.sha }}
-          name: "amalgam-lang-py ${{ inputs.version }}"
+          name: "${{ github.event.repository.name }} ${{ needs.metadata.outputs.version }}"
           artifactErrorsFailBuild: true
           generateReleaseNotes: true
           makeLatest: legacy
