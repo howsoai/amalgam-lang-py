@@ -62,7 +62,7 @@ jobs:
         build
 
     - name: Download Amalgam linux-amd64
-      if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any' || matrix.plat == 'manylinux_2_29_aarch64'
+      if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -71,6 +71,22 @@ jobs:
         gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "*linux-amd64*" "$run_id"
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
+
+    - name: Download Amalgam linux-arm64
+      if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
+        run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
+        if [[ "$run_type" == "run" ]]; then
+          pattern="*linux-arm64"
+        else
+          pattern="*linux-arm64.tar.gz"
+        fi
+        gh $run_type download -D amalgam/lib/linux/arm64 -R "howsoai/amalgam" -p "$pattern" "$run_id"
+        # Needed because release/non-release downloads are different structure
+        cd amalgam/lib/linux/arm64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Download Amalgam linux-arm64_8a
       if: matrix.plat == 'manylinux_2_29_aarch64' || matrix.plat == 'any'
