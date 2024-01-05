@@ -159,7 +159,7 @@ jobs:
         jq --arg head_sha "$head_sha" '.version |= . + {"amalgam_sha": $head_sha}' version.json > temp.json && mv temp.json version.json
         jq --arg url "$url" '.version |= . + {"amalgam_url": $url}' version.json > temp.json && mv temp.json version.json
         jq --arg build_date "$build_date" '.version |= . + {"amalgam_build_date": $build_date}' version.json > temp.json && mv temp.json version.json
-        jq --arg build_title "$build_title" '.version |= . + {"amalgam_display_title": $display_title}' version.json > temp.json && mv temp.json version.json
+        jq --arg build_title "$build_title" '.version |= . + {"amalgam_display_title": $build_title}' version.json > temp.json && mv temp.json version.json
         cat version.json
 
     - name: Build wheels
