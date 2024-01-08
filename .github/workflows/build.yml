@@ -191,7 +191,7 @@ jobs:
         name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}
         path: dist/amalgam_lang-*.whl
         if-no-files-found: error
-  
+
   workflow-summary:
     needs: ['metadata', 'build']
     uses: "howsoai/.github/.github/workflows/workflow-summary.yml@main"
@@ -253,7 +253,6 @@ jobs:
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
   pytest-windows-3-11-mt:
-    if: inputs.build-type != 'release'
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
