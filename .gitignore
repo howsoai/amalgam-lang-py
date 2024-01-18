@@ -11,6 +11,21 @@
 # Python Binaries
 *.py[oc]
 .cache/
+__pycache__
+
+# Unit test / coverage reports
+**/junit/**
+htmlcov/
+.tox/
+test
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
 
 #Building
 build/
