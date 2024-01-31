@@ -23,7 +23,7 @@ class _LoadEntityStatus(Structure):
     Linux, MacOS and Windows.
     """
     _fields_ = [
-        ("status", c_bool),
+        ("loaded", c_bool),
         ("message", c_char_p),
         ("version", c_char_p)
     ]
@@ -35,11 +35,11 @@ class LoadEntityStatus:
     """
     def __init__(self, c_status: _LoadEntityStatus = None):
         if c_status is None:
-            self.status = True
+            self.loaded = True
             self.message = ""
             self.version = ""
         else:
-            self.status = bool(c_status.status)
+            self.loaded = bool(c_status.loaded)
             self.message = c_status.message.decode("utf-8")
             self.version = c_status.version.decode("utf-8")
 
