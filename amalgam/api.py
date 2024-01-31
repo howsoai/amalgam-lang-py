@@ -33,7 +33,7 @@ class LoadEntityStatus:
     """
     Public status for LoadEntity
     """
-    def __init__(self, c_status=None):
+    def __init__(self, c_status: _LoadEntityStatus = None):
         if c_status is None:
             self.status = True
             self.message = ""
