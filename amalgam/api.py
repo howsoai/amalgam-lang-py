@@ -1,6 +1,6 @@
 from ctypes import (
     byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cdll, POINTER
+    cdll, POINTER, Structure
 )
 from datetime import datetime
 import gc
@@ -13,6 +13,38 @@ import warnings
 
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
+
+
+class _LoadEntityStatus(Structure):
+    """
+    A custom status class from Amalgam LoadEntity.
+
+    This is implemented with ctypes for accessing binary amalgam builds in
+    Linux, MacOS and Windows.
+    """
+    _fields_ = [
+        ("status", c_bool),
+        ("message", c_char_p),
+        ("version", c_char_p)
+    ]
+
+
+class LoadEntityStatus:
+    """
+    Public status for LoadEntity
+    """
+    def __init__(self, c_status=None):
+        if c_status is None:
+            self.status = True
+            self.message = ""
+            self.version = ""
+        else:
+            self.status = bool(c_status.status)
+            self.message = c_status.message.decode("utf-8")
+            self.version = c_status.version.decode("utf-8")
+
+    def __str__(self):
+        return f"{self.status},\"{self.message}\",\"{self.version}\""
 
 
 class Amalgam:
@@ -538,8 +570,8 @@ class Amalgam:
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
         self._log_execution(f"GET_JSON_FROM_LABEL {handle} {label}")
+        result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
         del handle_buf
         del label_buf
         self.gc()
@@ -583,7 +615,7 @@ class Amalgam:
         load_contained: bool = False,
         write_log: str = "",
         print_log: str = ""
-    ) -> bool:
+    ) -> LoadEntityStatus:
         """
         Load an entity from an amalgam source file.
 
@@ -607,12 +639,12 @@ class Amalgam:
 
         Returns
         -------
-        bool
-            True if the entity was successfully loaded.
+        LoadEntityStatus
+            Status of LoadEntity call.
         """
         self.amlg.LoadEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool, c_char_p, c_char_p]
-        self.amlg.LoadEntity.restype = c_bool
+        self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         amlg_path_buf = self.str_to_char_p(amlg_path)
         write_log_buf = self.str_to_char_p(write_log)
@@ -623,15 +655,17 @@ class Amalgam:
             f"{str(load_contained).lower()} {write_log} {print_log}"
         )
         self._log_execution(self.load_command_log_entry)
-        result = self.amlg.LoadEntity(
+        result = LoadEntityStatus(self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist, load_contained,
-            write_log_buf, print_log_buf)
+            write_log_buf, print_log_buf))
         self._log_reply(result)
+
         del handle_buf
         del amlg_path_buf
         del write_log_buf
         del print_log_buf
         self.gc()
+
         return result
 
     def get_entities(self) -> List[str]:
