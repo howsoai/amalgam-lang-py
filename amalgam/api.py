@@ -44,7 +44,7 @@ class LoadEntityStatus:
             self.version = c_status.version.decode("utf-8")
 
     def __str__(self):
-        return f"{self.status},\"{self.message}\",\"{self.version}\""
+        return f"{self.loaded},\"{self.message}\",\"{self.version}\""
 
 
 class Amalgam:
