@@ -146,7 +146,7 @@ class Amalgam:
                     execution_trace_dir).expanduser().absolute()
             # Create the trace directory if needed
             if not self.execution_trace_dir.exists():
-                self.execution_trace_dir.mkdir(parents=True)
+                self.execution_trace_dir.mkdir(parents=True, exist_ok=True)
 
             # increment a counter on the file name, if file already exists..
             self.execution_trace_filepath = Path(
