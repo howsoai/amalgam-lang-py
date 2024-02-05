@@ -17,9 +17,9 @@ _logger = logging.getLogger('amalgam')
 
 class _LoadEntityStatus(Structure):
     """
-    A custom status class from Amalgam LoadEntity.
+    A private status returned from Amalgam binary LoadEntity C API.
 
-    This is implemented with ctypes for accessing binary amalgam builds in
+    This is implemented with ctypes for accessing binary Amalgam builds in
     Linux, MacOS and Windows.
     """
     _fields_ = [
@@ -31,7 +31,10 @@ class _LoadEntityStatus(Structure):
 
 class LoadEntityStatus:
     """
-    Public status for LoadEntity
+    Status returned by :func:`~api.Amalgam.load_entity`.
+
+    This is implemented with python types and is meant to wrap _LoadEntityStatus
+    which uses ctypes and directly interacts with the Amalgam binaries.
     """
     def __init__(self, c_status: _LoadEntityStatus = None):
         if c_status is None:
