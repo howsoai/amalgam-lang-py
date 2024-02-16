@@ -19,8 +19,7 @@ class _LoadEntityStatus(Structure):
     """
     A private status returned from Amalgam binary LoadEntity C API.
 
-    This is implemented with ctypes for accessing binary Amalgam builds in
-    Linux, MacOS and Windows.
+    This is implemented with ctypes for accessing binary Amalgam builds.
     """
     _fields_ = [
         ("loaded", c_bool),
@@ -54,8 +53,7 @@ class Amalgam:
     """
     A general python direct interface to the Amalgam library.
 
-    This is implemented with ctypes for accessing binary amalgam builds in
-    Linux, MacOS and Windows.
+    This is implemented with ctypes for accessing binary Amalgam builds.
 
     Parameters
     ----------
