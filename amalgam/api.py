@@ -1,5 +1,5 @@
 from ctypes import (
-    byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    byref, cast, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
     cdll, POINTER
 )
 from datetime import datetime
@@ -479,6 +479,16 @@ class Amalgam:
             self.trace.write(execution_string + "\n")
             self.trace.flush()
 
+    def _copy_to_bytes(self, p) -> bytes:
+        """Copies a native C char* to bytes, cleaning up native memory correctly."""
+        bytes = cast(p, c_char_p).value
+
+        self.amlg.DeleteString.argtypes = c_char_p,
+        self.amlg.DeleteString.restype = None
+        self.amlg.DeleteString(p)
+
+        return bytes
+
     def gc(self) -> None:
         """Force garbage collection when called if self.force_gc is set."""
         if (
@@ -676,7 +686,7 @@ class Amalgam:
         bytes
             A byte-encoded json representation of the response.
         """
-        self.amlg.ExecuteEntityJsonPtr.restype = c_char_p
+        self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
         self.amlg.ExecuteEntityJsonPtr.argtype = [
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
@@ -684,8 +694,8 @@ class Amalgam:
         json_buf = self.str_to_char_p(json)
         self._log_time("EXECUTION START")
         self._log_execution(f"EXECUTE_ENTITY_JSON {handle} {label} {json}")
-        result = self.amlg.ExecuteEntityJsonPtr(
-            handle_buf, label_buf, json_buf)
+        result = self._copy_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+            handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
         del handle_buf
@@ -881,8 +891,8 @@ class Amalgam:
         bytes
             A version byte-encoded string with semver.
         """
-        self.amlg.GetVersionString.restype = c_char_p
-        amlg_version = self.amlg.GetVersionString()
+        self.amlg.GetVersionString.restype = POINTER(c_char)
+        amlg_version = self._copy_to_bytes(self.amlg.GetVersionString())
         self._log_comment(f"call to amlg.GetVersionString() - returned: "
                           f"{amlg_version}\n")
         return amlg_version
@@ -897,8 +907,8 @@ class Amalgam:
             A byte-encoded string with library concurrency type.
             Ex. b'MultiThreaded'
         """
-        self.amlg.GetConcurrencyTypeString.restype = c_char_p
-        amlg_concurrency_type = self.amlg.GetConcurrencyTypeString()
+        self.amlg.GetConcurrencyTypeString.restype = POINTER(c_char)
+        amlg_concurrency_type = self._copy_to_bytes(self.amlg.GetConcurrencyTypeString())
         self._log_comment(
             f"call to amlg.GetConcurrencyTypeString() - returned: "
             f"{amlg_concurrency_type}\n")
