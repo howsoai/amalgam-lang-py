@@ -50,7 +50,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.8"
 
@@ -179,14 +179,14 @@ jobs:
 
     - name: Upload Tarball Artifact
       if: matrix.plat == 'any'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: amalgam-lang-${{ needs.metadata.outputs.version }}
         path: dist/amalgam-lang-*.tar.gz
         if-no-files-found: error
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}
         path: dist/amalgam_lang-*.whl
@@ -300,7 +300,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: ./tmp
 
@@ -324,7 +324,7 @@ jobs:
           artifactContentType: application/gzip
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
