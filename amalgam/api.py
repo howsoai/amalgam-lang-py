@@ -650,7 +650,7 @@ class Amalgam:
         amlg_path: str,
         update_persistence_location: bool = False,
         store_contained: bool = False
-    ) -> bool:
+    ) -> None:
         """
         Stores an entity to an amalgam source file.
 
@@ -664,15 +664,9 @@ class Amalgam:
             If set to true, updates location entity is persisted to.
         store_contained : bool
             If set to true, contained entities will be stored.
-
-        Returns
-        -------
-        bool
-            True if the entity was successfully stored.
         """
         self.amlg.StoreEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool]
-        self.amlg.StoreEntity.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
@@ -681,13 +675,12 @@ class Amalgam:
             f"{str(store_contained).lower()}"
         )
         self._log_execution(self.store_command_log_entry)
-        result = self.amlg.StoreEntity(
+        self.amlg.StoreEntity(
             handle_buf, amlg_path_buf, update_persistence_location, store_contained)
-        self._log_reply(result)
+        self._log_reply(None)
         del handle_buf
         del amlg_path_buf
         self.gc()
-        return result
 
     def delete_entity(
         self,
@@ -700,7 +693,6 @@ class Amalgam:
         ----------
         handle : str
             The handle of the amalgam entity.
-
         """
         self.amlg.DeleteEntity.argtype = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
