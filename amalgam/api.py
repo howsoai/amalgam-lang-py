@@ -644,6 +644,74 @@ class Amalgam:
         self.gc()
         return result
 
+    def store_entity(
+        self,
+        handle: str,
+        amlg_path: str,
+        update_persistence_location: bool = False,
+        store_contained: bool = False
+    ) -> bool:
+        """
+        Stores an entity to an amalgam source file.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        amlg_path : str
+            The path to the filename.amlg/caml file.
+        update_persistence_location : bool
+            If set to true, updates location entity is persisted to.
+        store_contained : bool
+            If set to true, contained entities will be stored.
+
+        Returns
+        -------
+        bool
+            True if the entity was successfully stored.
+        """
+        self.amlg.StoreEntity.argtype = [
+            c_char_p, c_char_p, c_bool, c_bool]
+        self.amlg.StoreEntity.restype = c_bool
+        handle_buf = self.str_to_char_p(handle)
+        amlg_path_buf = self.str_to_char_p(amlg_path)
+
+        self.store_command_log_entry = (
+            f"STORE_ENTITY {handle} \"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"{str(store_contained).lower()}"
+        )
+        self._log_execution(self.store_command_log_entry)
+        result = self.amlg.StoreEntity(
+            handle_buf, amlg_path_buf, update_persistence_location, store_contained)
+        self._log_reply(result)
+        del handle_buf
+        del amlg_path_buf
+        self.gc()
+        return result
+
+    def delete_entity(
+        self,
+        handle: str
+    ) -> None:
+        """
+        Deletes an entity.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+
+        """
+        self.amlg.DeleteEntity.argtype = [c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+
+        self.delete_command_log_entry = f"DELETE_ENTITY {handle}"
+        self._log_execution(self.delete_command_log_entry)
+        self.amlg.DeleteEntity(handle_buf)
+        self._log_reply(None)
+        del handle_buf
+        self.gc()
+
     def get_entities(self) -> List[str]:
         """
         Get loaded top level entities.
