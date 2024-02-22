@@ -1,6 +1,6 @@
 from ctypes import (
     byref, cast, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cdll, POINTER
+    cdll, POINTER, Structure
 )
 from datetime import datetime
 import gc
@@ -15,12 +15,45 @@ import warnings
 _logger = logging.getLogger('amalgam')
 
 
+class _LoadEntityStatus(Structure):
+    """
+    A private status returned from Amalgam binary LoadEntity C API.
+
+    This is implemented with ctypes for accessing binary Amalgam builds.
+    """
+    _fields_ = [
+        ("loaded", c_bool),
+        ("message", POINTER(c_char)),
+        ("version", POINTER(c_char))
+    ]
+
+
+class LoadEntityStatus:
+    """
+    Status returned by :func:`~api.Amalgam.load_entity`.
+
+    This is implemented with python types and is meant to wrap _LoadEntityStatus
+    which uses ctypes and directly interacts with the Amalgam binaries.
+    """
+    def __init__(self, api, c_status: _LoadEntityStatus = None):
+        if c_status is None:
+            self.loaded = True
+            self.message = ""
+            self.version = ""
+        else:
+            self.loaded = bool(c_status.loaded)
+            self.message = api.char_p_to_bytes(c_status.message).decode("utf-8")
+            self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
+
+    def __str__(self):
+        return f"{self.loaded},\"{self.message}\",\"{self.version}\""
+
+
 class Amalgam:
     """
     A general python direct interface to the Amalgam library.
 
-    This is implemented with ctypes for accessing binary amalgam builds in
-    Linux, MacOS and Windows.
+    This is implemented with ctypes for accessing binary Amalgam builds.
 
     Parameters
     ----------
@@ -479,16 +512,6 @@ class Amalgam:
             self.trace.write(execution_string + "\n")
             self.trace.flush()
 
-    def _copy_to_bytes(self, p) -> bytes:
-        """Copies a native C char* to bytes, cleaning up native memory correctly."""
-        bytes = cast(p, c_char_p).value
-
-        self.amlg.DeleteString.argtypes = c_char_p,
-        self.amlg.DeleteString.restype = None
-        self.amlg.DeleteString(p)
-
-        return bytes
-
     def gc(self) -> None:
         """Force garbage collection when called if self.force_gc is set."""
         if (
@@ -506,7 +529,9 @@ class Amalgam:
         size: Optional[int] = None
     ) -> c_char:
         """
-        Convert a string to a c++ char pointer.
+        Convert a string to a C char pointer.
+
+        User must call `del` on returned buffer
 
         Parameters
         ----------
@@ -519,7 +544,7 @@ class Amalgam:
         Returns
         -------
         c_char
-            A c++ char point for the string.
+            A C char pointer for the string.
         """
         if isinstance(value, str):
             value = value.encode('utf-8')
@@ -527,6 +552,28 @@ class Amalgam:
         buf = buftype()
         buf.value = value
         return buf
+
+    def char_p_to_bytes(self, p: POINTER(c_char)) -> bytes:
+        """
+        Copies a native C char pointer to bytes, cleaning up native memory correctly.
+
+        Parameters
+        ----------
+        p : LP_char_p
+            C pointer to string to convert
+
+        Returns
+        -------
+        bytes
+            The byte-encoded string from C pointer
+        """
+        bytes = cast(p, c_char_p).value
+
+        self.amlg.DeleteString.argtypes = c_char_p,
+        self.amlg.DeleteString.restype = None
+        self.amlg.DeleteString(p)
+
+        return bytes
 
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
@@ -544,15 +591,19 @@ class Amalgam:
         bytes
             The byte-encoded json representation of the amalgam label.
         """
-        self.amlg.GetJSONPtrFromLabel.restype = c_char_p
+        self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
-        self._log_execution(f"GET_JSON_FROM_LABEL {handle} {label}")
+
+        self._log_execution(f"GET_JSON_FROM_LABEL \"{handle}\" \"{label}\"")
+        result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
+        self._log_reply(result)
+
         del handle_buf
         del label_buf
         self.gc()
+
         return result
 
     def set_json_to_label(
@@ -578,8 +629,11 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
-        self._log_execution(f"SET_JSON_TO_LABEL {handle} {label} {json}")
+
+        self._log_execution(f"SET_JSON_TO_LABEL \"{handle}\" \"{label}\" {json}")
         self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
+        self._log_reply(None)
+
         del handle_buf
         del label_buf
         del json_buf
@@ -593,7 +647,7 @@ class Amalgam:
         load_contained: bool = False,
         write_log: str = "",
         print_log: str = ""
-    ) -> bool:
+    ) -> LoadEntityStatus:
         """
         Load an entity from an amalgam source file.
 
@@ -617,32 +671,125 @@ class Amalgam:
 
         Returns
         -------
-        bool
-            True if the entity was successfully loaded.
+        LoadEntityStatus
+            Status of LoadEntity call.
         """
         self.amlg.LoadEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool, c_char_p, c_char_p]
-        self.amlg.LoadEntity.restype = c_bool
+        self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         amlg_path_buf = self.str_to_char_p(amlg_path)
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        self.load_command_log_entry = (
-            f"LOAD_ENTITY {handle} \"{amlg_path}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} {write_log} {print_log}"
+        load_command_log_entry = (
+            f"LOAD_ENTITY \"{handle}\" \"{amlg_path}\" {str(persist).lower()} "
+            f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
-        self._log_execution(self.load_command_log_entry)
-        result = self.amlg.LoadEntity(
+        self._log_execution(load_command_log_entry)
+        result = LoadEntityStatus(self, self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist, load_contained,
-            write_log_buf, print_log_buf)
+            write_log_buf, print_log_buf))
         self._log_reply(result)
+
         del handle_buf
         del amlg_path_buf
         del write_log_buf
         del print_log_buf
         self.gc()
+
         return result
+
+    def verify_entity(
+        self,
+        amlg_path: str
+    ) -> LoadEntityStatus:
+        """
+        Verify an entity from an amalgam source file.
+
+        Parameters
+        ----------
+        amlg_path : str
+            The path to the filename.amlg/caml file.
+
+        Returns
+        -------
+        LoadEntityStatus
+            Status of VerifyEntity call.
+        """
+        self.amlg.VerifyEntity.argtype = [c_char_p]
+        self.amlg.VerifyEntity.restype = _LoadEntityStatus
+        amlg_path_buf = self.str_to_char_p(amlg_path)
+
+        self._log_execution(f"VERIFY_ENTITY \"{amlg_path}\"")
+        result = LoadEntityStatus(self, self.amlg.VerifyEntity(amlg_path_buf))
+        self._log_reply(result)
+
+        del amlg_path_buf
+        self.gc()
+
+        return result
+
+    def store_entity(
+        self,
+        handle: str,
+        amlg_path: str,
+        update_persistence_location: bool = False,
+        store_contained: bool = False
+    ) -> None:
+        """
+        Stores an entity to the file type specified within amlg_path.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        amlg_path : str
+            The path to the filename.amlg/caml file.
+        update_persistence_location : bool
+            If set to true, updates location entity is persisted to.
+        store_contained : bool
+            If set to true, contained entities will be stored.
+        """
+        self.amlg.StoreEntity.argtype = [
+            c_char_p, c_char_p, c_bool, c_bool]
+        handle_buf = self.str_to_char_p(handle)
+        amlg_path_buf = self.str_to_char_p(amlg_path)
+
+        store_command_log_entry = (
+            f"STORE_ENTITY \"{handle}\" \"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"{str(store_contained).lower()}"
+        )
+        self._log_execution(store_command_log_entry)
+        self.amlg.StoreEntity(
+            handle_buf, amlg_path_buf, update_persistence_location, store_contained)
+        self._log_reply(None)
+
+        del handle_buf
+        del amlg_path_buf
+        self.gc()
+
+    def destroy_entity(
+        self,
+        handle: str
+    ) -> None:
+        """
+        Destroys an entity.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        """
+        self.amlg.DestroyEntity.argtype = [c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+
+        self._log_execution(f"DESTROY_ENTITY \"{handle}\"")
+        self.amlg.DestroyEntity(handle_buf)
+        self._log_reply(None)
+
+        del handle_buf
+        self.gc()
 
     def get_entities(self) -> List[str]:
         """
@@ -658,9 +805,11 @@ class Amalgam:
         num_entities = c_uint64()
         entities = self.amlg.GetEntities(byref(num_entities))
         result = [entities[i].decode() for i in range(num_entities.value)]
+
         del entities
         del num_entities
         self.gc()
+
         return result
 
     def execute_entity_json(
@@ -692,15 +841,18 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
+
         self._log_time("EXECUTION START")
-        self._log_execution(f"EXECUTE_ENTITY_JSON {handle} {label} {json}")
-        result = self._copy_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+        self._log_execution(f"EXECUTE_ENTITY_JSON \"{handle}\" \"{label}\" {json}")
+        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
+
         del handle_buf
         del label_buf
         del json_buf
+
         return result
 
     def set_number_value(self, handle: str, label: str, value: float) -> None:
@@ -721,7 +873,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         val = c_double(value)
+
         self.amlg.SetNumberValue(handle_buf, label_buf, val)
+
         del handle_buf
         del label_buf
         del val
@@ -747,9 +901,12 @@ class Amalgam:
         self.amlg.GetNumberValue.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
+
         result = self.amlg.GetNumberValue(handle_buf, label_buf)
+
         del handle_buf
         del label_buf
+
         return result
 
     def set_string_value(
@@ -775,7 +932,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         val_buf = self.str_to_char_p(value)
+
         self.amlg.SetStringValue(handle_buf, label_buf, val_buf)
+
         del handle_buf
         del label_buf
         del val_buf
@@ -801,15 +960,18 @@ class Amalgam:
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
+
         size = self.amlg.GetStringListLength(handle_buf, label_buf)
         value_buf = self.amlg.GetStringListPtr(handle_buf, label_buf)
         result = None
         if value_buf is not None and size > 0:
             result = value_buf[0]
+
         del handle_buf
         del label_buf
         del value_buf
         self.gc()
+
         return result
 
     def set_string_list(
@@ -845,6 +1007,7 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         self.amlg.SetStringList(handle_buf, label_buf, value_buf, size)
+
         del handle_buf
         del label_buf
         del value_buf
@@ -873,13 +1036,16 @@ class Amalgam:
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
+
         size = self.amlg.GetStringListLength(handle_buf, label_buf)
         value_buf = self.amlg.GetStringListPtr(handle_buf, label_buf)
         value = [value_buf[i] for i in range(size)]
+
         del handle_buf
         del label_buf
         del value_buf
         self.gc()
+
         return value
 
     def get_version_string(self) -> bytes:
@@ -892,7 +1058,7 @@ class Amalgam:
             A version byte-encoded string with semver.
         """
         self.amlg.GetVersionString.restype = POINTER(c_char)
-        amlg_version = self._copy_to_bytes(self.amlg.GetVersionString())
+        amlg_version = self.char_p_to_bytes(self.amlg.GetVersionString())
         self._log_comment(f"call to amlg.GetVersionString() - returned: "
                           f"{amlg_version}\n")
         return amlg_version
@@ -908,7 +1074,7 @@ class Amalgam:
             Ex. b'MultiThreaded'
         """
         self.amlg.GetConcurrencyTypeString.restype = POINTER(c_char)
-        amlg_concurrency_type = self._copy_to_bytes(self.amlg.GetConcurrencyTypeString())
+        amlg_concurrency_type = self.char_p_to_bytes(self.amlg.GetConcurrencyTypeString())
         self._log_comment(
             f"call to amlg.GetConcurrencyTypeString() - returned: "
             f"{amlg_concurrency_type}\n")
