@@ -544,12 +544,12 @@ class Amalgam:
         bytes
             The byte-encoded json representation of the amalgam label.
         """
-        self.amlg.GetJSONPtrFromLabel.restype = c_char_p
+        self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         self._log_execution(f"GET_JSON_FROM_LABEL \"{handle}\" \"{label}\"")
-        result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
+        result = self._copy_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
         self._log_reply(result)
         del handle_buf
         del label_buf
