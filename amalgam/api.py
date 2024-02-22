@@ -23,8 +23,8 @@ class _LoadEntityStatus(Structure):
     """
     _fields_ = [
         ("loaded", c_bool),
-        ("message", c_char_p),
-        ("version", c_char_p)
+        ("message", POINTER(c_char)),
+        ("version", POINTER(c_char))
     ]
 
 
@@ -35,15 +35,15 @@ class LoadEntityStatus:
     This is implemented with python types and is meant to wrap _LoadEntityStatus
     which uses ctypes and directly interacts with the Amalgam binaries.
     """
-    def __init__(self, c_status: _LoadEntityStatus = None):
+    def __init__(self, amlg, c_status: _LoadEntityStatus = None):
         if c_status is None:
             self.loaded = True
             self.message = ""
             self.version = ""
         else:
             self.loaded = bool(c_status.loaded)
-            self.message = c_status.message.decode("utf-8")
-            self.version = c_status.version.decode("utf-8")
+            self.message = amlg.char_p_to_bytes(c_status.message).decode("utf-8")
+            self.version = amlg.char_p_to_bytes(c_status.version).decode("utf-8")
 
     def __str__(self):
         return f"{self.loaded},\"{self.message}\",\"{self.version}\""
@@ -512,16 +512,6 @@ class Amalgam:
             self.trace.write(execution_string + "\n")
             self.trace.flush()
 
-    def _copy_to_bytes(self, p) -> bytes:
-        """Copies a native C char* to bytes, cleaning up native memory correctly."""
-        bytes = cast(p, c_char_p).value
-
-        self.amlg.DeleteString.argtypes = c_char_p,
-        self.amlg.DeleteString.restype = None
-        self.amlg.DeleteString(p)
-
-        return bytes
-
     def gc(self) -> None:
         """Force garbage collection when called if self.force_gc is set."""
         if (
@@ -560,6 +550,16 @@ class Amalgam:
         buf = buftype()
         buf.value = value
         return buf
+
+    def char_p_to_bytes(self, p) -> bytes:
+        """Copies a native C char* to bytes, cleaning up native memory correctly."""
+        bytes = cast(p, c_char_p).value
+
+        self.amlg.DeleteString.argtypes = c_char_p,
+        self.amlg.DeleteString.restype = None
+        self.amlg.DeleteString(p)
+
+        return bytes
 
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
@@ -666,7 +666,7 @@ class Amalgam:
             f"{str(load_contained).lower()} {write_log} {print_log}"
         )
         self._log_execution(self.load_command_log_entry)
-        result = LoadEntityStatus(self.amlg.LoadEntity(
+        result = LoadEntityStatus(self.amlg, self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist, load_contained,
             write_log_buf, print_log_buf))
         self._log_reply(result)
@@ -729,7 +729,7 @@ class Amalgam:
         json_buf = self.str_to_char_p(json)
         self._log_time("EXECUTION START")
         self._log_execution(f"EXECUTE_ENTITY_JSON {handle} {label} {json}")
-        result = self._copy_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
@@ -927,7 +927,7 @@ class Amalgam:
             A version byte-encoded string with semver.
         """
         self.amlg.GetVersionString.restype = POINTER(c_char)
-        amlg_version = self._copy_to_bytes(self.amlg.GetVersionString())
+        amlg_version = self.char_p_to_bytes(self.amlg.GetVersionString())
         self._log_comment(f"call to amlg.GetVersionString() - returned: "
                           f"{amlg_version}\n")
         return amlg_version
@@ -943,7 +943,7 @@ class Amalgam:
             Ex. b'MultiThreaded'
         """
         self.amlg.GetConcurrencyTypeString.restype = POINTER(c_char)
-        amlg_concurrency_type = self._copy_to_bytes(self.amlg.GetConcurrencyTypeString())
+        amlg_concurrency_type = self.char_p_to_bytes(self.amlg.GetConcurrencyTypeString())
         self._log_comment(
             f"call to amlg.GetConcurrencyTypeString() - returned: "
             f"{amlg_concurrency_type}\n")
