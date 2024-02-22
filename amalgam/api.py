@@ -548,8 +548,9 @@ class Amalgam:
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
+        self._log_execution(f"GET_JSON_FROM_LABEL \"{handle}\" \"{label}\"")
         result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
-        self._log_execution(f"GET_JSON_FROM_LABEL {handle} {label}")
+        self._log_reply(result)
         del handle_buf
         del label_buf
         self.gc()
@@ -578,8 +579,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
-        self._log_execution(f"SET_JSON_TO_LABEL {handle} {label} {json}")
+        self._log_execution(f"SET_JSON_TO_LABEL \"{handle}\" \"{label}\" {json}")
         self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
+        self._log_reply(None)
         del handle_buf
         del label_buf
         del json_buf
@@ -629,8 +631,8 @@ class Amalgam:
         print_log_buf = self.str_to_char_p(print_log)
 
         self.load_command_log_entry = (
-            f"LOAD_ENTITY {handle} \"{amlg_path}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} {write_log} {print_log}"
+            f"LOAD_ENTITY \"{handle}\" \"{amlg_path}\" {str(persist).lower()} "
+            f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
         self._log_execution(self.load_command_log_entry)
         result = self.amlg.LoadEntity(
@@ -652,7 +654,7 @@ class Amalgam:
         store_contained: bool = False
     ) -> None:
         """
-        Stores an entity to an amalgam source file.
+        Stores an entity to the file type specified within amlg_path.
 
         Parameters
         ----------
@@ -671,7 +673,7 @@ class Amalgam:
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
         self.store_command_log_entry = (
-            f"STORE_ENTITY {handle} \"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"STORE_ENTITY \"{handle}\" \"{amlg_path}\" {str(update_persistence_location).lower()} "
             f"{str(store_contained).lower()}"
         )
         self._log_execution(self.store_command_log_entry)
@@ -682,24 +684,24 @@ class Amalgam:
         del amlg_path_buf
         self.gc()
 
-    def delete_entity(
+    def destroy_entity(
         self,
         handle: str
     ) -> None:
         """
-        Deletes an entity.
+        Destroys an entity.
 
         Parameters
         ----------
         handle : str
             The handle of the amalgam entity.
         """
-        self.amlg.DeleteEntity.argtype = [c_char_p]
+        self.amlg.DestroyEntity.argtype = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
 
-        self.delete_command_log_entry = f"DELETE_ENTITY {handle}"
-        self._log_execution(self.delete_command_log_entry)
-        self.amlg.DeleteEntity(handle_buf)
+        self.destroy_command_log_entry = f"DESTROY_ENTITY \"{handle}\""
+        self._log_execution(self.destroy_command_log_entry)
+        self.amlg.DestroyEntity(handle_buf)
         self._log_reply(None)
         del handle_buf
         self.gc()
@@ -753,7 +755,7 @@ class Amalgam:
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
         self._log_time("EXECUTION START")
-        self._log_execution(f"EXECUTE_ENTITY_JSON {handle} {label} {json}")
+        self._log_execution(f"EXECUTE_ENTITY_JSON \"{handle}\" \"{label}\" {json}")
         result = self._copy_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
