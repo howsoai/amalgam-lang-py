@@ -35,15 +35,15 @@ class LoadEntityStatus:
     This is implemented with python types and is meant to wrap _LoadEntityStatus
     which uses ctypes and directly interacts with the Amalgam binaries.
     """
-    def __init__(self, amlg, c_status: _LoadEntityStatus = None):
+    def __init__(self, api, c_status: _LoadEntityStatus = None):
         if c_status is None:
             self.loaded = True
             self.message = ""
             self.version = ""
         else:
             self.loaded = bool(c_status.loaded)
-            self.message = amlg.char_p_to_bytes(c_status.message).decode("utf-8")
-            self.version = amlg.char_p_to_bytes(c_status.version).decode("utf-8")
+            self.message = api.char_p_to_bytes(c_status.message).decode("utf-8")
+            self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
 
     def __str__(self):
         return f"{self.loaded},\"{self.message}\",\"{self.version}\""
@@ -553,13 +553,13 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p) -> bytes:
+    def char_p_to_bytes(self, p: POINTER(c_char)) -> bytes:
         """
         Copies a native C char pointer to bytes, cleaning up native memory correctly.
 
         Parameters
         ----------
-        p : c_char_p
+        p : LP_char_p
             C pointer to string to convert
 
         Returns
@@ -687,7 +687,7 @@ class Amalgam:
             f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
-        result = LoadEntityStatus(self.amlg, self.amlg.LoadEntity(
+        result = LoadEntityStatus(self, self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist, load_contained,
             write_log_buf, print_log_buf))
         self._log_reply(result)
@@ -718,11 +718,11 @@ class Amalgam:
             Status of VerifyEntity call.
         """
         self.amlg.VerifyEntity.argtype = [c_char_p]
-        self.amlg.LoadEntity.restype = _LoadEntityStatus
+        self.amlg.VerifyEntity.restype = _LoadEntityStatus
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
         self._log_execution(f"VERIFY_ENTITY \"{amlg_path}\"")
-        result = LoadEntityStatus(self.amlg, self.amlg.VerifyEntity(amlg_path_buf))
+        result = LoadEntityStatus(self, self.amlg.VerifyEntity(amlg_path_buf))
         self._log_reply(result)
 
         del amlg_path_buf
