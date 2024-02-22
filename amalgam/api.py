@@ -577,12 +577,13 @@ class Amalgam:
         bytes
             The byte-encoded json representation of the amalgam label.
         """
-        self.amlg.GetJSONPtrFromLabel.restype = c_char_p
+        self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        self._log_execution(f"GET_JSON_FROM_LABEL {handle} {label}")
-        result = self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf)
+        self._log_execution(f"GET_JSON_FROM_LABEL \"{handle}\" \"{label}\"")
+        result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
+        self._log_reply(result)
         del handle_buf
         del label_buf
         self.gc()
@@ -611,8 +612,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
-        self._log_execution(f"SET_JSON_TO_LABEL {handle} {label} {json}")
+        self._log_execution(f"SET_JSON_TO_LABEL \"{handle}\" \"{label}\" {json}")
         self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
+        self._log_reply(None)
         del handle_buf
         del label_buf
         del json_buf
@@ -662,8 +664,8 @@ class Amalgam:
         print_log_buf = self.str_to_char_p(print_log)
 
         self.load_command_log_entry = (
-            f"LOAD_ENTITY {handle} \"{amlg_path}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} {write_log} {print_log}"
+            f"LOAD_ENTITY \"{handle}\" \"{amlg_path}\" {str(persist).lower()} "
+            f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
         self._log_execution(self.load_command_log_entry)
         result = LoadEntityStatus(self.amlg, self.amlg.LoadEntity(
@@ -678,6 +680,66 @@ class Amalgam:
         self.gc()
 
         return result
+
+    def store_entity(
+        self,
+        handle: str,
+        amlg_path: str,
+        update_persistence_location: bool = False,
+        store_contained: bool = False
+    ) -> None:
+        """
+        Stores an entity to the file type specified within amlg_path.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        amlg_path : str
+            The path to the filename.amlg/caml file.
+        update_persistence_location : bool
+            If set to true, updates location entity is persisted to.
+        store_contained : bool
+            If set to true, contained entities will be stored.
+        """
+        self.amlg.StoreEntity.argtype = [
+            c_char_p, c_char_p, c_bool, c_bool]
+        handle_buf = self.str_to_char_p(handle)
+        amlg_path_buf = self.str_to_char_p(amlg_path)
+
+        self.store_command_log_entry = (
+            f"STORE_ENTITY \"{handle}\" \"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"{str(store_contained).lower()}"
+        )
+        self._log_execution(self.store_command_log_entry)
+        self.amlg.StoreEntity(
+            handle_buf, amlg_path_buf, update_persistence_location, store_contained)
+        self._log_reply(None)
+        del handle_buf
+        del amlg_path_buf
+        self.gc()
+
+    def destroy_entity(
+        self,
+        handle: str
+    ) -> None:
+        """
+        Destroys an entity.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        """
+        self.amlg.DestroyEntity.argtype = [c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+
+        self.destroy_command_log_entry = f"DESTROY_ENTITY \"{handle}\""
+        self._log_execution(self.destroy_command_log_entry)
+        self.amlg.DestroyEntity(handle_buf)
+        self._log_reply(None)
+        del handle_buf
+        self.gc()
 
     def get_entities(self) -> List[str]:
         """
@@ -728,7 +790,7 @@ class Amalgam:
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
         self._log_time("EXECUTION START")
-        self._log_execution(f"EXECUTE_ENTITY_JSON {handle} {label} {json}")
+        self._log_execution(f"EXECUTE_ENTITY_JSON \"{handle}\" \"{label}\" {json}")
         result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
