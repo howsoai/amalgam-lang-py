@@ -137,7 +137,7 @@ jobs:
         cp version.json amalgam/lib/version.json
         if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
           amlg=$(find "$(pwd)" -type f -name 'amalgam-mt.exe')
-        elif [[ "${{ matrix.plat }}" ~= macos ]]; then
+        elif [[ "${{ matrix.plat }}" ~= macosx ]]; then
           amlg=$(find "$(pwd)" -type f -name 'amalgam-mt-noavx')
         elif [[ "${{ matrix.plat }}" == 'any' ]]; then
           amlg="$(pwd)/amalgam/lib/linux/amd64/bin/amalgam-mt"
