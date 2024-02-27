@@ -133,23 +133,8 @@ jobs:
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Format lib dir
-      if: matrix.plat != 'macosx_12_0_arm64'
       run: |
         cp version.json amalgam/lib/version.json
-        if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
-          amlg=$(find "$(pwd)" -type f -name 'amalgam-mt.exe')
-        elif [[ "${{ matrix.plat }}" =~ macosx ]]; then
-          amlg=$(find "$(pwd)" -type f -name 'amalgam-mt-noavx')
-        elif [[ "${{ matrix.plat }}" == 'any' ]]; then
-          amlg="$(pwd)/amalgam/lib/linux/amd64/bin/amalgam-mt"
-        else
-          amlg=$(find "$(pwd)" -type f -name 'amalgam-mt')
-        fi
-        echo "Found amalgam-mt at: $amlg"
-        chmod +x "$amlg"
-        amlg_version=$($amlg --version)
-        echo "Amalgam version: $amlg_version"
-
         cd amalgam/lib
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
