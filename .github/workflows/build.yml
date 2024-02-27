@@ -132,19 +132,10 @@ jobs:
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
-    - name: Format lib dir and add workflow metadata
+    - name: Format lib dir
       run: |
         cp version.json amalgam/lib/version.json
         cd amalgam/lib
-        if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
-          fp=$(find ./ -type f -name 'amalgam-mt.exe')
-        elif [[ "${{ matrix.plat }}" == 'any' ]]; then
-          fp="./linux/amd64/bin/amalgam-mt"
-        else
-          fp=$(find ./ -type f -name 'amalgam-mt')
-        fi
-        echo "Found amalgam-mt at: $fp"
-        cp $fp ~/
         sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
