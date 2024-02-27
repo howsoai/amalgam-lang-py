@@ -145,6 +145,7 @@ jobs:
           amlg=$(find "$(pwd)" -type f -name 'amalgam-mt')
         fi
         echo "Found amalgam-mt at: $amlg"
+        chmod +x "$amlg"
         amlg_version=$($amlg --version)
         echo "Amalgam version: $amlg_version"
 
