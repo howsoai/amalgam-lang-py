@@ -133,6 +133,7 @@ jobs:
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
     - name: Format lib dir
+      if: matrix.plat != 'macosx_12_0_arm64'
       run: |
         cp version.json amalgam/lib/version.json
         if [[ "${{ matrix.plat }}" == 'win_amd64' ]]; then
