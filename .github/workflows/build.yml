@@ -134,8 +134,8 @@ jobs:
 
     - name: Format lib dir and version.json
       run: |
-        version_file = $(find "$(pwd)/amalgam/lib" -type f -name "version.json" | head -n1)
-        new_version_file = "amalgam/lib/version.json"
+        version_file=$(find "$(pwd)/amalgam/lib" -type f -name "version.json" | head -n1)
+        new_version_file="amalgam/lib/version.json"
         if [ -f "${version_file}" ]; then
           cp "${version_file}" $new_version_file
           jq '{version: {amalgam: .version}}' $new_version_file > $new_version_file
