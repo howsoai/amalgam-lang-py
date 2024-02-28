@@ -138,7 +138,7 @@ jobs:
         new_version_file="amalgam/lib/version.json"
         if [ -f "${version_file}" ]; then
           cp "${version_file}" $new_version_file
-          jq '{version: {amalgam: .version}}' $new_version_file > $new_version_file
+          jq '{version: {amalgam: .version}}' $new_version_file > ${new_version_file}.tmp && mv ${new_version_file}.tmp ${new_version_file}
         else
           # Fall back to what is checked into repo:
           cp version.json $new_version_file
