@@ -132,11 +132,20 @@ jobs:
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/windows/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
-    - name: Format lib dir
+    - name: Format lib dir and version.json
       run: |
-        cp version.json amalgam/lib/version.json
+        version_file=$(find "$(pwd)/amalgam/lib" -type f -name "version.json" | head -n1)
+        new_version_file="amalgam/lib/version.json"
+        if [ -f "${version_file}" ]; then
+          cp "${version_file}" $new_version_file
+          jq '{version: {amalgam: .version}}' $new_version_file > $new_version_file
+        else
+          # Fall back to what is checked into repo:
+          cp version.json $new_version_file
+          sed -i 's/dependencies/version/g' $new_version_file
+        fi
+
         cd amalgam/lib
-        sed -i 's/dependencies/version/g' version.json
         find . -type d -name lib -exec sh -c 'mv {}/* "$(dirname {})"' \;
 
     - name: Set amalgam version metadata
@@ -273,6 +282,7 @@ jobs:
     if: inputs.build-type == 'release'
     needs:
       - metadata
+      - workflow-summary
       - pytest-linux-3-8-st
       - pytest-linux-3-9-mt
       - pytest-linux-3-10-mt
