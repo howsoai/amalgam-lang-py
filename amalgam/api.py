@@ -1109,9 +1109,4 @@ class Amalgam:
         str
             The modified version of s with escaped double quotes.
         """
-        o = ''
-        for c in s:
-            if c == '"':
-                o += '\\'
-            o += c
-        return o
+        return s.replace('"', '\\"')
