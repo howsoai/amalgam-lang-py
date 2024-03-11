@@ -596,7 +596,10 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
-        self._log_execution(f"GET_JSON_FROM_LABEL \"{handle}\" \"{label}\"")
+        self._log_execution((
+            f"GET_JSON_FROM_LABEL \"{self.escape_double_quotes(handle)}\" "
+            f"\"{self.escape_double_quotes(label)}\""
+        ))
         result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
         self._log_reply(result)
 
@@ -630,7 +633,11 @@ class Amalgam:
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
 
-        self._log_execution(f"SET_JSON_TO_LABEL \"{handle}\" \"{label}\" {json}")
+        self._log_execution((
+            f"SET_JSON_TO_LABEL \"{self.escape_double_quotes(handle)}\" "
+            f"\"{self.escape_double_quotes(label)}\" "
+            f"{json}"
+        ))
         self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
         self._log_reply(None)
 
@@ -683,7 +690,8 @@ class Amalgam:
         print_log_buf = self.str_to_char_p(print_log)
 
         load_command_log_entry = (
-            f"LOAD_ENTITY \"{handle}\" \"{amlg_path}\" {str(persist).lower()} "
+            f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
+            f"\"{amlg_path}\" {str(persist).lower()} "
             f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
@@ -757,7 +765,8 @@ class Amalgam:
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
         store_command_log_entry = (
-            f"STORE_ENTITY \"{handle}\" \"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
+            f"\"{amlg_path}\" {str(update_persistence_location).lower()} "
             f"{str(store_contained).lower()}"
         )
         self._log_execution(store_command_log_entry)
@@ -784,7 +793,7 @@ class Amalgam:
         self.amlg.DestroyEntity.argtype = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
 
-        self._log_execution(f"DESTROY_ENTITY \"{handle}\"")
+        self._log_execution(f"DESTROY_ENTITY \"{self.escape_double_quotes(handle)}\"")
         self.amlg.DestroyEntity(handle_buf)
         self._log_reply(None)
 
@@ -843,7 +852,12 @@ class Amalgam:
         json_buf = self.str_to_char_p(json)
 
         self._log_time("EXECUTION START")
-        self._log_execution(f"EXECUTE_ENTITY_JSON \"{handle}\" \"{label}\" {json}")
+        self._log_execution((
+            "EXECUTE_ENTITY_JSON "
+            f"\"{self.escape_double_quotes(handle)}\" "
+            f"\"{self.escape_double_quotes(label)}\" "
+            f"{json}"
+        ))
         result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
@@ -1079,3 +1093,20 @@ class Amalgam:
             f"call to amlg.GetConcurrencyTypeString() - returned: "
             f"{amlg_concurrency_type}\n")
         return amlg_concurrency_type
+
+    @staticmethod
+    def escape_double_quotes(s: str) -> str:
+        """
+        Get the string with backslashes preceeding contained double quotes.
+
+        Parameters
+        ----------
+        s : str
+            The input string.
+
+        Returns
+        -------
+        str
+            The modified version of s with escaped double quotes.
+        """
+        return s.replace('"', '\\"')
