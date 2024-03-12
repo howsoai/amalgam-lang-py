@@ -691,7 +691,7 @@ class Amalgam:
 
         load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{amlg_path}\" {str(persist).lower()} "
+            f"\"{self.escape_double_quotes(amlg_path)}\" {str(persist).lower()} "
             f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
@@ -729,7 +729,7 @@ class Amalgam:
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
-        self._log_execution(f"VERIFY_ENTITY \"{amlg_path}\"")
+        self._log_execution(f"VERIFY_ENTITY \"{self.escape_double_quotes(amlg_path)}\"")
         result = LoadEntityStatus(self, self.amlg.VerifyEntity(amlg_path_buf))
         self._log_reply(result)
 
@@ -766,7 +766,8 @@ class Amalgam:
 
         store_command_log_entry = (
             f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{amlg_path}\" {str(update_persistence_location).lower()} "
+            f"\"{self.escape_double_quotes(amlg_path)}\" "
+            f"{str(update_persistence_location).lower()} "
             f"{str(store_contained).lower()}"
         )
         self._log_execution(store_command_log_entry)
