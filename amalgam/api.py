@@ -11,6 +11,9 @@ import re
 from typing import Any, List, Optional, Tuple, Union
 import warnings
 
+from .c_api_scope import CAPIScope
+
+
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
 
@@ -46,7 +49,7 @@ class LoadEntityStatus:
             self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
 
     def __str__(self):
-        return f"{self.loaded},\"{self.message}\",\"{self.version}\""
+        return f'{self.loaded},"{self.message}","{self.version}"'
 
 
 class Amalgam:
@@ -63,7 +66,7 @@ class Amalgam:
         appropriate library bundled with the package.
 
     append_trace_file : bool, default False
-        If True, new content will be appended to a tracefile if the file
+        If True, new content will be appended to a trace file if the file
         already exists rather than creating a new file.
 
     execution_trace_dir : Union[str, None], default None
@@ -478,7 +481,7 @@ class Amalgam:
 
     def _log_time(self, label: str) -> None:
         """
-        Log a labelled timestamp to the tracefile.
+        Log a labelled timestamp to the trace file.
 
         Parameters
         ----------
@@ -593,19 +596,17 @@ class Amalgam:
         """
         self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
 
-        self._log_execution((
-            f"GET_JSON_FROM_LABEL \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\""
-        ))
-        result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
-        self._log_reply(result)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
 
-        del handle_buf
-        del label_buf
-        self.gc()
+            self._log_execution((
+                f'GET_JSON_FROM_LABEL "{self.escape_double_quotes(handle)}" '
+                f'"{self.escape_double_quotes(label)}"'
+            ))
+            result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(scope.handle_buf, scope.label_buf))
+            self._log_reply(result)
 
         return result
 
@@ -629,22 +630,17 @@ class Amalgam:
         """
         self.amlg.SetJSONToLabel.restype = c_void_p
         self.amlg.SetJSONToLabel.argtype = [c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
+        with CAPIScope as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
+            scope.json_buf = self.str_to_char_p(json)
 
-        self._log_execution((
-            f"SET_JSON_TO_LABEL \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\" "
-            f"{json}"
-        ))
-        self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
-        self._log_reply(None)
-
-        del handle_buf
-        del label_buf
-        del json_buf
-        self.gc()
+            self._log_execution((
+                f'SET_JSON_TO_LABEL "{self.escape_double_quotes(handle)}" '
+                f'"{self.escape_double_quotes(label)}" {json}'))
+            self.amlg.SetJSONToLabel(
+                scope.handle_buf, scope.label_buf, scope.json_buf)
+            self._log_reply(None)
 
     def load_entity(
         self,
@@ -684,27 +680,23 @@ class Amalgam:
         self.amlg.LoadEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool, c_char_p, c_char_p]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
-        handle_buf = self.str_to_char_p(handle)
-        amlg_path_buf = self.str_to_char_p(amlg_path)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.amlg_path_buf = self.str_to_char_p(amlg_path)
+            scope.write_log_buf = self.str_to_char_p(write_log)
+            scope.print_log_buf = self.str_to_char_p(print_log)
 
-        load_command_log_entry = (
-            f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(amlg_path)}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
-        )
-        self._log_execution(load_command_log_entry)
-        result = LoadEntityStatus(self, self.amlg.LoadEntity(
-            handle_buf, amlg_path_buf, persist, load_contained,
-            write_log_buf, print_log_buf))
-        self._log_reply(result)
-
-        del handle_buf
-        del amlg_path_buf
-        del write_log_buf
-        del print_log_buf
-        self.gc()
+            load_command_log_entry = (
+                f'LOAD_ENTITY "{self.escape_double_quotes(handle)}" '
+                f'"{self.escape_double_quotes(amlg_path)}" '
+                f'{str(persist).lower()} {str(load_contained).lower()} '
+                f'"{write_log}" "{print_log}"'
+            )
+            self._log_execution(load_command_log_entry)
+            result = LoadEntityStatus(self, self.amlg.LoadEntity(
+                scope.handle_buf, scope.amlg_path_buf, persist, load_contained,
+                scope.write_log_buf, scope.print_log_buf))
+            self._log_reply(result)
 
         return result
 
@@ -727,14 +719,12 @@ class Amalgam:
         """
         self.amlg.VerifyEntity.argtype = [c_char_p]
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        with CAPIScope() as scope:
+            scope.amlg_path_buf = self.str_to_char_p(amlg_path)
 
-        self._log_execution(f"VERIFY_ENTITY \"{self.escape_double_quotes(amlg_path)}\"")
-        result = LoadEntityStatus(self, self.amlg.VerifyEntity(amlg_path_buf))
-        self._log_reply(result)
-
-        del amlg_path_buf
-        self.gc()
+            self._log_execution(f'VERIFY_ENTITY "{self.escape_double_quotes(amlg_path)}"')
+            result = LoadEntityStatus(self, self.amlg.VerifyEntity(scope.amlg_path_buf))
+            self._log_reply(result)
 
         return result
 
@@ -761,23 +751,21 @@ class Amalgam:
         """
         self.amlg.StoreEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool]
-        handle_buf = self.str_to_char_p(handle)
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.amlg_path_buf = self.str_to_char_p(amlg_path)
 
-        store_command_log_entry = (
-            f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(amlg_path)}\" "
-            f"{str(update_persistence_location).lower()} "
-            f"{str(store_contained).lower()}"
-        )
-        self._log_execution(store_command_log_entry)
-        self.amlg.StoreEntity(
-            handle_buf, amlg_path_buf, update_persistence_location, store_contained)
-        self._log_reply(None)
-
-        del handle_buf
-        del amlg_path_buf
-        self.gc()
+            store_command_log_entry = (
+                f'STORE_ENTITY "{self.escape_double_quotes(handle)}" '
+                f'"{self.escape_double_quotes(amlg_path)}" '
+                f'{str(update_persistence_location).lower()} '
+                f'{str(store_contained).lower()}'
+            )
+            self._log_execution(store_command_log_entry)
+            self.amlg.StoreEntity(
+                scope.handle_buf, scope.amlg_path_buf,
+                update_persistence_location, store_contained)
+            self._log_reply(None)
 
     def destroy_entity(
         self,
@@ -792,14 +780,13 @@ class Amalgam:
             The handle of the amalgam entity.
         """
         self.amlg.DestroyEntity.argtype = [c_char_p]
-        handle_buf = self.str_to_char_p(handle)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
 
-        self._log_execution(f"DESTROY_ENTITY \"{self.escape_double_quotes(handle)}\"")
-        self.amlg.DestroyEntity(handle_buf)
-        self._log_reply(None)
-
-        del handle_buf
-        self.gc()
+            self._log_execution(
+                f'DESTROY_ENTITY "{self.escape_double_quotes(handle)}"')
+            self.amlg.DestroyEntity(scope.handle_buf)
+            self._log_reply(None)
 
     def get_entities(self) -> List[str]:
         """
@@ -812,13 +799,13 @@ class Amalgam:
         """
         self.amlg.GetEntities.argtype = [POINTER(c_uint64)]
         self.amlg.GetEntities.restype = POINTER(c_char_p)
-        num_entities = c_uint64()
-        entities = self.amlg.GetEntities(byref(num_entities))
-        result = [entities[i].decode() for i in range(num_entities.value)]
-
-        del entities
-        del num_entities
-        self.gc()
+        with CAPIScope() as scope:
+            scope.num_entities = c_uint64()
+            scope.entities = self.amlg.GetEntities(byref(scope.num_entities))
+            result = [
+                scope.entities[i].decode()
+                for i in range(scope.num_entities.value)
+            ]
 
         return result
 
@@ -848,25 +835,22 @@ class Amalgam:
         self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
         self.amlg.ExecuteEntityJsonPtr.argtype = [
             c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
+        with CAPIScope as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
+            scope.json_buf = self.str_to_char_p(json)
 
-        self._log_time("EXECUTION START")
-        self._log_execution((
-            "EXECUTE_ENTITY_JSON "
-            f"\"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\" "
-            f"{json}"
-        ))
-        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
-            handle_buf, label_buf, json_buf))
-        self._log_time("EXECUTION STOP")
-        self._log_reply(result)
-
-        del handle_buf
-        del label_buf
-        del json_buf
+            self._log_time("EXECUTION START")
+            self._log_execution((
+                'EXECUTE_ENTITY_JSON '
+                f'"{self.escape_double_quotes(handle)}" '
+                f'"{self.escape_double_quotes(label)}" '
+                f'{json}'
+            ))
+            result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+                scope.handle_buf, scope.label_buf, scope.json_buf))
+            self._log_time("EXECUTION STOP")
+            self._log_reply(result)
 
         return result
 
@@ -885,16 +869,13 @@ class Amalgam:
         """
         self.amlg.SetNumberValue.restype = c_void_p
         self.amlg.SetNumberValue.argtype = [c_char_p, c_char_p, c_double]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        val = c_double(value)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
+            scope.val = c_double(value)
 
-        self.amlg.SetNumberValue(handle_buf, label_buf, val)
-
-        del handle_buf
-        del label_buf
-        del val
-        self.gc()
+            self.amlg.SetNumberValue(
+                scope.handle_buf, scope.label_buf, scope.val)
 
     def get_number_value(self, handle: str, label: str) -> float:
         """
@@ -914,13 +895,12 @@ class Amalgam:
         """
         self.amlg.GetNumberValue.restype = c_double
         self.amlg.GetNumberValue.argtype = [c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
 
-        result = self.amlg.GetNumberValue(handle_buf, label_buf)
-
-        del handle_buf
-        del label_buf
+            result = self.amlg.GetNumberValue(
+                scope.handle_buf, scope.label_buf)
 
         return result
 
@@ -944,16 +924,13 @@ class Amalgam:
         """
         self.amlg.SetStringValue.restype = c_void_p
         self.amlg.SetStringValue.argtype = [c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        val_buf = self.str_to_char_p(value)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
+            scope.val_buf = self.str_to_char_p(value)
 
-        self.amlg.SetStringValue(handle_buf, label_buf, val_buf)
-
-        del handle_buf
-        del label_buf
-        del val_buf
-        self.gc()
+            self.amlg.SetStringValue(
+                scope.handle_buf, scope.label_buf, scope.val_buf)
 
     def get_string_value(self, handle: str, label: str) -> Union[bytes, None]:
         """
@@ -973,19 +950,15 @@ class Amalgam:
         """
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
 
-        size = self.amlg.GetStringListLength(handle_buf, label_buf)
-        value_buf = self.amlg.GetStringListPtr(handle_buf, label_buf)
-        result = None
-        if value_buf is not None and size > 0:
-            result = value_buf[0]
-
-        del handle_buf
-        del label_buf
-        del value_buf
-        self.gc()
+            size = self.amlg.GetStringListLength(scope.handle_buf, scope.label_buf)
+            scope.value_buf = self.amlg.GetStringListPtr(scope.handle_buf, scope.label_buf)
+            result = None
+            if scope.value_buf is not None and size > 0:
+                result = scope.value_buf[0]
 
         return result
 
@@ -1012,21 +985,18 @@ class Amalgam:
             c_char_p, c_char_p, POINTER(c_char_p), c_size_t]
 
         size = len(value)
-        value_buf = (c_char_p * size)()
-        for i in range(size):
-            if isinstance(value[i], bytes):
-                value_buf[i] = c_char_p(value[i])
-            else:
-                value_buf[i] = c_char_p(value[i].encode('utf-8'))
+        with CAPIScope() as scope:
+            scope.value_buf = (c_char_p * size)()
+            for i in range(size):
+                if isinstance(value[i], bytes):
+                    scope.value_buf[i] = c_char_p(value[i])
+                else:
+                    scope.value_buf[i] = c_char_p(value[i].encode('utf-8'))
 
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        self.amlg.SetStringList(handle_buf, label_buf, value_buf, size)
-
-        del handle_buf
-        del label_buf
-        del value_buf
-        self.gc()
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
+            self.amlg.SetStringList(
+                scope.handle_buf, scope.label_buf, scope.value_buf, size)
 
     def get_string_list(self, handle: str, label: str) -> List[bytes]:
         """
@@ -1049,17 +1019,15 @@ class Amalgam:
         self.amlg.GetStringListLength.argtype = [c_char_p, c_char_p]
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
+        with CAPIScope() as scope:
+            scope.handle_buf = self.str_to_char_p(handle)
+            scope.label_buf = self.str_to_char_p(label)
 
-        size = self.amlg.GetStringListLength(handle_buf, label_buf)
-        value_buf = self.amlg.GetStringListPtr(handle_buf, label_buf)
-        value = [value_buf[i] for i in range(size)]
-
-        del handle_buf
-        del label_buf
-        del value_buf
-        self.gc()
+            size = self.amlg.GetStringListLength(scope.handle_buf,
+                                                 scope.label_buf)
+            scope.value_buf = self.amlg.GetStringListPtr(scope.handle_buf,
+                                                         scope.label_buf)
+            value = [scope.value_buf[i] for i in range(size)]
 
         return value
 
@@ -1098,7 +1066,7 @@ class Amalgam:
     @staticmethod
     def escape_double_quotes(s: str) -> str:
         """
-        Get the string with backslashes preceeding contained double quotes.
+        Get the string with backslashes preceding contained double quotes.
 
         Parameters
         ----------
