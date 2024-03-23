@@ -782,10 +782,10 @@ class Amalgam:
         print_log_buf = self.str_to_char_p(print_log)
 
         load_command_log_entry = (
-            f"CLONE_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(clone_handle)}\" "
-            f"\"{self.escape_double_quotes(amlg_path)}\" {str(persist).lower()} "
-            f"\"{write_log}\" \"{print_log}\""
+            f'CLONE_ENTITY "{self.escape_double_quotes(handle)}" '
+            f'"{self.escape_double_quotes(clone_handle)}" '
+            f'"{self.escape_double_quotes(amlg_path)}" {str(persist).lower()} '
+            f'"{write_log}" "{print_log}"'
         )
         self._log_execution(load_command_log_entry)
         result = self.amlg.LoadEntity(
@@ -890,8 +890,8 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
-        self._log_execution(f"SET_RANDOM_SEED \"{self.escape_double_quotes(handle)}\""
-                            f"\"{self.escape_double_quotes(rand_seed)}\"")
+        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}"'
+                            f'"{self.escape_double_quotes(rand_seed)}"')
         self.amlg.SetRandomSeed(handle_buf, rand_seed)
         self._log_reply(None)
 
