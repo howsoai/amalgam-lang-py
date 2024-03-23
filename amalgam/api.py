@@ -3,7 +3,6 @@ from ctypes import (
     cdll, POINTER, Structure
 )
 from datetime import datetime
-import gc
 import logging
 from pathlib import Path
 import platform
@@ -11,7 +10,7 @@ import re
 from typing import Any, List, Optional, Tuple, Union
 import warnings
 
-from .c_api_scope import CAPIScope
+from .scope_manager import CAPIScopeManager
 
 
 # Set to amalgam
@@ -173,9 +172,8 @@ class Amalgam:
         self.amlg = cdll.LoadLibrary(str(self.library_path))
         self.set_amlg_flags(sbf_datastore_enabled)
         self.set_max_num_threads(max_num_threads)
-        self.gc_interval = gc_interval
-        self.op_count = 0
         self.load_command_log_entry = None
+        self.scope_manager = CAPIScopeManager(gc_interval=gc_interval)
 
     @classmethod
     def _get_allowed_postfixes(cls, library_dir: Path) -> List[str]:
@@ -515,17 +513,6 @@ class Amalgam:
             self.trace.write(execution_string + "\n")
             self.trace.flush()
 
-    def gc(self) -> None:
-        """Force garbage collection when called if self.force_gc is set."""
-        if (
-            self.gc_interval is not None
-            and self.op_count > self.gc_interval
-        ):
-            _logger.debug("Collecting Garbage")
-            gc.collect()
-            self.op_count = 0
-        self.op_count += 1
-
     def str_to_char_p(
         self,
         value: Union[str, bytes],
@@ -597,7 +584,7 @@ class Amalgam:
         self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
         self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
 
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
 
@@ -630,7 +617,7 @@ class Amalgam:
         """
         self.amlg.SetJSONToLabel.restype = c_void_p
         self.amlg.SetJSONToLabel.argtype = [c_char_p, c_char_p, c_char_p]
-        with CAPIScope as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
             scope.json_buf = self.str_to_char_p(json)
@@ -680,7 +667,7 @@ class Amalgam:
         self.amlg.LoadEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool, c_char_p, c_char_p]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.amlg_path_buf = self.str_to_char_p(amlg_path)
             scope.write_log_buf = self.str_to_char_p(write_log)
@@ -719,7 +706,7 @@ class Amalgam:
         """
         self.amlg.VerifyEntity.argtype = [c_char_p]
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.amlg_path_buf = self.str_to_char_p(amlg_path)
 
             self._log_execution(f'VERIFY_ENTITY "{self.escape_double_quotes(amlg_path)}"')
@@ -751,7 +738,7 @@ class Amalgam:
         """
         self.amlg.StoreEntity.argtype = [
             c_char_p, c_char_p, c_bool, c_bool]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.amlg_path_buf = self.str_to_char_p(amlg_path)
 
@@ -780,7 +767,7 @@ class Amalgam:
             The handle of the amalgam entity.
         """
         self.amlg.DestroyEntity.argtype = [c_char_p]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
 
             self._log_execution(
@@ -799,7 +786,7 @@ class Amalgam:
         """
         self.amlg.GetEntities.argtype = [POINTER(c_uint64)]
         self.amlg.GetEntities.restype = POINTER(c_char_p)
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.num_entities = c_uint64()
             scope.entities = self.amlg.GetEntities(byref(scope.num_entities))
             result = [
@@ -835,7 +822,7 @@ class Amalgam:
         self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
         self.amlg.ExecuteEntityJsonPtr.argtype = [
             c_char_p, c_char_p, c_char_p]
-        with CAPIScope as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
             scope.json_buf = self.str_to_char_p(json)
@@ -869,7 +856,7 @@ class Amalgam:
         """
         self.amlg.SetNumberValue.restype = c_void_p
         self.amlg.SetNumberValue.argtype = [c_char_p, c_char_p, c_double]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
             scope.val = c_double(value)
@@ -895,7 +882,7 @@ class Amalgam:
         """
         self.amlg.GetNumberValue.restype = c_double
         self.amlg.GetNumberValue.argtype = [c_char_p, c_char_p]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
 
@@ -924,7 +911,7 @@ class Amalgam:
         """
         self.amlg.SetStringValue.restype = c_void_p
         self.amlg.SetStringValue.argtype = [c_char_p, c_char_p, c_char_p]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
             scope.val_buf = self.str_to_char_p(value)
@@ -950,7 +937,7 @@ class Amalgam:
         """
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
 
@@ -985,7 +972,7 @@ class Amalgam:
             c_char_p, c_char_p, POINTER(c_char_p), c_size_t]
 
         size = len(value)
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.value_buf = (c_char_p * size)()
             for i in range(size):
                 if isinstance(value[i], bytes):
@@ -1019,7 +1006,7 @@ class Amalgam:
         self.amlg.GetStringListLength.argtype = [c_char_p, c_char_p]
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
         self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
-        with CAPIScope() as scope:
+        with self.scope_manager.capi_scope() as scope:
             scope.handle_buf = self.str_to_char_p(handle)
             scope.label_buf = self.str_to_char_p(label)
 
