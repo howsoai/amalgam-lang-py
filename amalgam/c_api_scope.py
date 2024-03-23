@@ -25,6 +25,4 @@ class CAPIScope:
 
     def __exit__(self, type, value, traceback):
         """Exit the context manager."""
-        print(self.__dict__)
         self._hard_delete_attrs()
-        print(self.__dict__)
