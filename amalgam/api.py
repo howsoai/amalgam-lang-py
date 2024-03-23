@@ -1,6 +1,6 @@
 from ctypes import (
-    byref, cast, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cdll, POINTER, Structure
+    byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    cast, cdll, POINTER, Structure
 )
 from datetime import datetime
 import logging
@@ -23,6 +23,7 @@ class _LoadEntityStatus(Structure):
 
     This is implemented with ctypes for accessing binary Amalgam builds.
     """
+
     _fields_ = [
         ("loaded", c_bool),
         ("message", POINTER(c_char)),
@@ -37,6 +38,7 @@ class LoadEntityStatus:
     This is implemented with python types and is meant to wrap _LoadEntityStatus
     which uses ctypes and directly interacts with the Amalgam binaries.
     """
+
     def __init__(self, api, c_status: _LoadEntityStatus = None):
         if c_status is None:
             self.loaded = True
@@ -48,6 +50,7 @@ class LoadEntityStatus:
             self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
 
     def __str__(self):
+        """Emit a string representation."""
         return f'{self.loaded},"{self.message}","{self.version}"'
 
 
@@ -545,7 +548,7 @@ class Amalgam:
 
     def char_p_to_bytes(self, p: POINTER(c_char)) -> bytes:
         """
-        Copies a native C char pointer to bytes, cleaning up native memory correctly.
+        Copy a native C char pointer to bytes, cleaning up native memory correctly.
 
         Parameters
         ----------
@@ -723,7 +726,7 @@ class Amalgam:
         store_contained: bool = False
     ) -> None:
         """
-        Stores an entity to the file type specified within amlg_path.
+        Store an entity to the file type specified within amlg_path.
 
         Parameters
         ----------
