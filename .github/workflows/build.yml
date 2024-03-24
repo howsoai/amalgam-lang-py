@@ -278,7 +278,7 @@ jobs:
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  release:
+  publish:
     if: inputs.build-type == 'release'
     needs:
       - metadata
@@ -289,6 +289,34 @@ jobs:
       - pytest-linux-3-11-mt
       - pytest-macos-3-11-mt
       - pytest-windows-3-11-mt
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./tmp
+
+    - name: Configure environment
+      run: |
+        mkdir -p dist
+        find ./tmp -type f -name '*.whl' -exec cp -t ./dist {} +
+        find ./tmp -type f -name '*.tar.gz' -exec cp -t ./dist {} +
+        ls ./dist
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Publish [PyPi]
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    if: inputs.build-type == 'release'
+    needs:
+      - metadata
+      - publish
     uses: howsoai/.github/.github/workflows/release.yml@main
     secrets: inherit
     with:
