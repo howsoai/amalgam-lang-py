@@ -290,6 +290,8 @@ jobs:
       - pytest-macos-3-11-mt
       - pytest-windows-3-11-mt
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
 
     - name: Download Artifacts
