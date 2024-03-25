@@ -664,10 +664,10 @@ class Amalgam:
             The handle to assign the entity.
         amlg_path : str
             The path to the filename.amlg/caml file.
-        persist : bool
+        persist : bool, default False
             If set to true, all transactions will trigger the entity to be
             saved over the original source.
-        load_contained : bool
+        load_contained : bool, default False
             If set to true, contained entities will be loaded.
         write_log : str, default ""
             Path to the write log. If empty string, the write log is
@@ -737,6 +737,71 @@ class Amalgam:
         self.gc()
 
         return result
+    
+    def clone_entity(
+        self,
+        handle: str,
+        clone_handle: str,
+        amlg_path: str = "",
+        persist: bool = False,
+        write_log: str = "",
+        print_log: str = ""
+    ) -> bool:
+        """
+        Clones entity specified by handle into a new entity specified by clone_handle.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity to clone.
+        clone_handle : str
+            The handle to clone the entity into.
+        amlg_path : str, default ""
+            The path to store the filename.amlg/caml file.  Only relevant if persist is True.
+        persist : bool, default False
+            If set to true, all transactions will trigger the entity to be
+            saved over the original source.
+        write_log : str, default ""
+            Path to the write log. If empty string, the write log is
+            not generated.
+        print_log : str, default ""
+            Path to the print log. If empty string, the print log is
+            not generated.
+
+        Returns
+        -------
+        bool
+            True if cloned successfully, False if not.
+        """
+        self.amlg.CloneEntity.argtype = [
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+        clone_handle_buf = self.str_to_char_p(clone_handle)
+        amlg_path_buf = self.str_to_char_p(amlg_path)
+        write_log_buf = self.str_to_char_p(write_log)
+        print_log_buf = self.str_to_char_p(print_log)
+
+        clone_command_log_entry = (
+            f'CLONE_ENTITY "{self.escape_double_quotes(handle)}" '
+            f'"{self.escape_double_quotes(clone_handle)}" '
+            f'"{self.escape_double_quotes(amlg_path)}" {str(persist).lower()} '
+            f'"{write_log}" "{print_log}"'
+        )
+        self._log_execution(clone_command_log_entry)
+        result = self.amlg.LoadEntity(
+            handle_buf, amlg_path_buf, persist,
+            write_log_buf, print_log_buf)
+        self._log_reply(result)
+
+        del handle_buf
+        del clone_handle_buf
+        del amlg_path_buf
+        del write_log_buf
+        del print_log_buf
+        self.gc()
+
+        return result
+        
 
     def store_entity(
         self,
@@ -800,6 +865,42 @@ class Amalgam:
 
         del handle_buf
         self.gc()
+
+    def set_random_seed(
+        self,
+        handle: str,
+        rand_seed: str
+    ) -> bool:
+        """
+        Sets an entity's random seed.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        rand_seed : str
+            A string representing the random seed to set.
+
+        Returns
+        -------
+        bool
+            True if the set was successful, false if not.
+        """
+        self.amlg.SetRandomSeed.argtype = [c_char_p, c_char_p]
+        self.amlg.SetRandomSeed.restype = c_bool
+
+        handle_buf = self.str_to_char_p(handle)
+        rand_seed_buf = self.str_to_char_p(rand_seed)
+
+        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}"'
+                            f'"{self.escape_double_quotes(rand_seed)}"')
+        result = self.amlg.SetRandomSeed(handle_buf, rand_seed)
+        self._log_reply(None)
+
+        del handle_buf
+        del rand_seed_buf
+        self.gc()
+        return result
 
     def get_entities(self) -> List[str]:
         """
