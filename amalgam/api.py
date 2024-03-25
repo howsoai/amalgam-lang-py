@@ -781,13 +781,13 @@ class Amalgam:
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        load_command_log_entry = (
+        clone_command_log_entry = (
             f'CLONE_ENTITY "{self.escape_double_quotes(handle)}" '
             f'"{self.escape_double_quotes(clone_handle)}" '
             f'"{self.escape_double_quotes(amlg_path)}" {str(persist).lower()} '
             f'"{write_log}" "{print_log}"'
         )
-        self._log_execution(load_command_log_entry)
+        self._log_execution(clone_command_log_entry)
         result = self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist,
             write_log_buf, print_log_buf)
@@ -872,7 +872,7 @@ class Amalgam:
         rand_seed: str
     ) -> bool:
         """
-        Sets an entity's random seed
+        Sets an entity's random seed.
 
         Parameters
         ----------
@@ -887,17 +887,20 @@ class Amalgam:
             True if the set was successful, false if not.
         """
         self.amlg.SetRandomSeed.argtype = [c_char_p, c_char_p]
+        self.amlg.SetRandomSeed.restype = c_bool
+
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
         self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}"'
                             f'"{self.escape_double_quotes(rand_seed)}"')
-        self.amlg.SetRandomSeed(handle_buf, rand_seed)
+        result = self.amlg.SetRandomSeed(handle_buf, rand_seed)
         self._log_reply(None)
 
         del handle_buf
         del rand_seed_buf
         self.gc()
+        return result
 
     def get_entities(self) -> List[str]:
         """
