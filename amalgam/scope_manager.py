@@ -5,6 +5,10 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+class _Vars:
+    """Simple class whose instances can be assigned an attribute."""
+
+
 class CAPIScopeManager:
     """
     A variable scope which aggressively garbage collects on exit.
@@ -31,23 +35,21 @@ class CAPIScopeManager:
             self.gc_interval = None
         self._op_count = 0
 
+    def _gc(self):
+        if self._gc_interval is not None:
+            if self._op_count >= self._gc_interval:
+                _logger.debug("Collecting Garbage")
+                gc.collect()
+                self._op_count = 0
+            else:
+                self._op_count += 1
+
     @contextmanager
     def capi_scope(self):
         """Implement a context for managing vars."""
-        class _Vars:
-            pass
-
         scope_vars = _Vars()
         try:
             yield scope_vars
         finally:
-            for attr in list(scope_vars.__dict__.keys()):
-                del scope_vars.__dict__[attr]
-
-            if self._gc_interval is not None:
-                if self._op_count >= self._gc_interval:
-                    _logger.debug("Collecting Garbage")
-                    gc.collect()
-                    self._op_count = 0
-                else:
-                    self._op_count += 1
+            del scope_vars
+            self._gc()
