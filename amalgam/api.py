@@ -211,7 +211,7 @@ class Amalgam:
         str or None
             The library postfix of the filename, or None if no postfix.
         """
-        matches = re.findall(r'-(.+?)\.', filename)
+        matches = re.findall(r'-([^.]+)(?:\.[^.]*)?$', filename)
         if len(matches) > 0:
             return f'-{matches[-1]}'
         else:
@@ -737,7 +737,7 @@ class Amalgam:
         self.gc()
 
         return result
-    
+
     def clone_entity(
         self,
         handle: str,
@@ -801,7 +801,6 @@ class Amalgam:
         self.gc()
 
         return result
-        
 
     def store_entity(
         self,
