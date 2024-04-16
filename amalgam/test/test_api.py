@@ -1,12 +1,14 @@
 from pathlib import Path, WindowsPath
 from platform import system
-import pytest
+import warnings
 
 from amalgam import api
 from amalgam.api import Amalgam
+import pytest
 
 
 def resources_root():
+    """Get resources root path."""
     return Path(Path(api.__file__).parent, "resources")
 
 
@@ -130,13 +132,15 @@ def test_get_library_path_postfix_warns(mocker, amalgam_factory, path_in,
     mocker.patch('amalgam.api.platform.machine', return_value='arm64')
 
     if raise_warning:
-        with pytest.warns(UserWarning, match='and will be ignored.') as record:
+        with pytest.warns(UserWarning, match='and will be ignored.'):
+            # Will fail if there are no warnings
             amlg = amalgam_factory(library_path=path_in,
                                    library_postfix=postfix_in)
     else:
-        with pytest.warns(None) as record:
+        with warnings.catch_warnings():
+            # Will fail if there are any warnings
+            warnings.simplefilter('error')
             amlg = amalgam_factory(library_path=path_in,
                                    library_postfix=postfix_in)
-        assert not len(record)
 
     assert amlg.library_postfix == postfix
