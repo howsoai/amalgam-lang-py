@@ -798,8 +798,8 @@ class Amalgam:
             f'"{write_log}" "{print_log}"'
         )
         self._log_execution(clone_command_log_entry)
-        result = self.amlg.LoadEntity(
-            handle_buf, amlg_path_buf, persist,
+        result = self.amlg.CloneEntity(
+            handle_buf, clone_handle_buf, amlg_path_buf, persist,
             write_log_buf, print_log_buf)
         self._log_reply(result)
 
