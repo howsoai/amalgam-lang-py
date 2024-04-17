@@ -52,7 +52,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.8"
+        python-version: "3.11"
 
     - name: Install cibuildwheel
       run: >-
@@ -181,8 +181,8 @@ jobs:
       if: matrix.plat == 'any'
       uses: actions/upload-artifact@v4
       with:
-        name: amalgam-lang-${{ needs.metadata.outputs.version }}
-        path: dist/amalgam-lang-*.tar.gz
+        name: amalgam_lang-${{ needs.metadata.outputs.version }}
+        path: dist/amalgam_lang-*.tar.gz
         if-no-files-found: error
 
     - name: Upload Wheel Artifact
@@ -199,21 +199,7 @@ jobs:
     with:
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  pytest-linux-3-8-st:
-    needs: ['metadata', 'build']
-    uses: howsoai/.github/.github/workflows/pytest.yml@main
-    secrets: inherit
-    with:
-      platform: 'howso-ubuntu-runner-latest'
-      platform-pretty: 'Linux'
-      amalgam-plat-arch: 'linux-amd64'
-      python-version: '3.8'
-      config-fp: './config/latest-st-debug-howso.yml'
-      config-pretty: 'ST'
-      workers: 'auto'
-      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-
-  pytest-linux-3-9-mt:
+  pytest-linux-3-9-st:
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
@@ -222,8 +208,9 @@ jobs:
       platform-pretty: 'Linux'
       amalgam-plat-arch: 'linux-amd64'
       python-version: '3.9'
-      config-fp: './config/latest-mt-debug-howso.yml'
-      config-pretty: 'MT'
+      config-fp: './config/latest-st-debug-howso.yml'
+      config-pretty: 'ST'
+      workers: 'auto'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
   pytest-linux-3-10-mt:
@@ -252,7 +239,20 @@ jobs:
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  pytest-windows-3-11-mt:
+  pytest-linux-3-12-mt:
+    needs: ['metadata', 'build']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
+    secrets: inherit
+    with:
+      platform: 'howso-ubuntu-runner-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.12'
+      config-fp: './config/latest-mt-debug-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+
+  pytest-windows-3-12-mt:
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
@@ -260,12 +260,12 @@ jobs:
       platform: 'howso-windows-runner-latest'
       platform-pretty: 'Windows'
       amalgam-plat-arch: 'windows-amd64'
-      python-version: '3.11'
+      python-version: '3.12'
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  pytest-macos-3-11-mt:
+  pytest-macos-3-12-mt:
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
@@ -273,7 +273,7 @@ jobs:
       platform: 'macos-latest-xlarge'
       platform-pretty: 'MacOS'
       amalgam-plat-arch: 'darwin-arm64'
-      python-version: '3.11'
+      python-version: '3.12'
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
@@ -283,12 +283,12 @@ jobs:
     needs:
       - metadata
       - workflow-summary
-      - pytest-linux-3-8-st
-      - pytest-linux-3-9-mt
+      - pytest-linux-3-9-st
       - pytest-linux-3-10-mt
       - pytest-linux-3-11-mt
-      - pytest-macos-3-11-mt
-      - pytest-windows-3-11-mt
+      - pytest-linux-3-12-mt
+      - pytest-macos-3-12-mt
+      - pytest-windows-3-12-mt
     runs-on: ubuntu-latest
     environment:
       name: PyPi
@@ -316,14 +316,64 @@ jobs:
     - name: Publish [PyPi]
       uses: pypa/gh-action-pypi-publish@release/v1
 
+  generate-changelog:
+    if: inputs.build-type == 'release'
+    secrets: inherit
+    needs:
+      - metadata
+    uses: "howsoai/.github/.github/workflows/release-notes.yml@main"
+
   release:
     if: inputs.build-type == 'release'
     needs:
       - metadata
-      - publish
-    uses: howsoai/.github/.github/workflows/release.yml@main
-    secrets: inherit
-    with:
-      publish_location: 'PyPi'
-      version: ${{ needs.metadata.outputs.version }}
-      publish_name: 'amalgam-lang'
+      - generate-changelog
+      - workflow-summary
+      - pytest-linux-3-9-st
+      - pytest-linux-3-10-mt
+      - pytest-linux-3-11-mt
+      - pytest-linux-3-12-mt
+      - pytest-macos-3-12-mt
+      - pytest-windows-3-12-mt
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./tmp
+
+      - name: Clean up dir
+        run: |
+          mkdir -p dist
+          find ./tmp -type f -name '*.whl' -exec mv -t ./dist {} +
+          find ./tmp -type f -name '*.tar.gz' -exec mv -t ./dist {} +
+          ls ./dist
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.metadata.outputs.version }}
+          commit: ${{ github.sha }}
+          name: "${{ github.event.repository.name }} ${{ needs.metadata.outputs.version }}"
+          artifactErrorsFailBuild: true
+          body: ${{ needs.generate-changelog.outputs.changelog }}
+          makeLatest: legacy
+          artifacts: "dist/*"
+          artifactContentType: application/gzip
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
