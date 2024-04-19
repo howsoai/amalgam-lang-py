@@ -650,8 +650,11 @@ class Amalgam:
         self,
         handle: str,
         amlg_path: str,
+        *,
         persist: bool = False,
         load_contained: bool = False,
+        escape_filename: bool = False,
+        escape_contained_filenames: bool = True,
         write_log: str = "",
         print_log: str = ""
     ) -> LoadEntityStatus:
@@ -669,6 +672,11 @@ class Amalgam:
             saved over the original source.
         load_contained : bool, default False
             If set to true, contained entities will be loaded.
+        escape_filename : bool, default False
+            If set to true, the filename will be aggressively escaped.
+        escape_contained_filenames : bool, default True
+            If set to true, the filenames of contained entities will be
+            aggressively escaped.
         write_log : str, default ""
             Path to the write log. If empty string, the write log is
             not generated.
@@ -682,7 +690,7 @@ class Amalgam:
             Status of LoadEntity call.
         """
         self.amlg.LoadEntity.argtype = [
-            c_char_p, c_char_p, c_bool, c_bool, c_char_p, c_char_p]
+            c_char_p, c_char_p, c_bool, c_bool, c_bool, c_bool, c_char_p, c_char_p]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         amlg_path_buf = self.str_to_char_p(amlg_path)
@@ -692,11 +700,14 @@ class Amalgam:
         load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(amlg_path)}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} \"{write_log}\" \"{print_log}\""
+            f"{str(load_contained).lower()} {str(escape_filename).lower()} "
+            f"{str(escape_contained_filenames).lower()} \"{write_log}\" "
+            f"\"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
         result = LoadEntityStatus(self, self.amlg.LoadEntity(
             handle_buf, amlg_path_buf, persist, load_contained,
+            escape_filename, escape_contained_filenames,
             write_log_buf, print_log_buf))
         self._log_reply(result)
 
@@ -742,6 +753,7 @@ class Amalgam:
         self,
         handle: str,
         clone_handle: str,
+        *,
         amlg_path: str = "",
         persist: bool = False,
         write_log: str = "",
@@ -788,8 +800,8 @@ class Amalgam:
             f'"{write_log}" "{print_log}"'
         )
         self._log_execution(clone_command_log_entry)
-        result = self.amlg.LoadEntity(
-            handle_buf, amlg_path_buf, persist,
+        result = self.amlg.CloneEntity(
+            handle_buf, clone_handle_buf, amlg_path_buf, persist,
             write_log_buf, print_log_buf)
         self._log_reply(result)
 
@@ -806,6 +818,7 @@ class Amalgam:
         self,
         handle: str,
         amlg_path: str,
+        *,
         update_persistence_location: bool = False,
         store_contained: bool = False
     ) -> None:
