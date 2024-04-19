@@ -676,7 +676,7 @@ class Amalgam:
             If set to true, the filename will be aggressively escaped.
         escape_contained_filenames : bool, default False
             If set to true, the filenames of contained entities will be
-            aggresively escaped.
+            aggressively escaped.
         write_log : str, default ""
             Path to the write log. If empty string, the write log is
             not generated.
