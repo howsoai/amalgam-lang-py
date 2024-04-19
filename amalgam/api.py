@@ -650,6 +650,7 @@ class Amalgam:
         self,
         handle: str,
         amlg_path: str,
+        *,
         persist: bool = False,
         load_contained: bool = False,
         escape_filename: bool = False,
@@ -752,6 +753,7 @@ class Amalgam:
         self,
         handle: str,
         clone_handle: str,
+        *,
         amlg_path: str = "",
         persist: bool = False,
         write_log: str = "",
@@ -816,6 +818,7 @@ class Amalgam:
         self,
         handle: str,
         amlg_path: str,
+        *,
         update_persistence_location: bool = False,
         store_contained: bool = False
     ) -> None:
