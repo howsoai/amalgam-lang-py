@@ -654,7 +654,7 @@ class Amalgam:
         persist: bool = False,
         load_contained: bool = False,
         escape_filename: bool = False,
-        escape_contained_filenames: bool = False,
+        escape_contained_filenames: bool = True,
         write_log: str = "",
         print_log: str = ""
     ) -> LoadEntityStatus:
@@ -674,7 +674,7 @@ class Amalgam:
             If set to true, contained entities will be loaded.
         escape_filename : bool, default False
             If set to true, the filename will be aggressively escaped.
-        escape_contained_filenames : bool, default False
+        escape_contained_filenames : bool, default True
             If set to true, the filenames of contained entities will be
             aggressively escaped.
         write_log : str, default ""
