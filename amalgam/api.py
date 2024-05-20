@@ -87,11 +87,6 @@ class Amalgam:
         it within library_path. If neither are available, -mt (multi-threaded)
         will be used.
 
-    max_num_threads : int, default 0
-        If a multithreaded Amalgam binary is used, sets the maximum number
-        of threads to the value specified. If 0, will use the number of
-        visible logical cores.
-
     sbf_datastore_enabled : bool, default False
         If true, sbf tree structures are enabled.
 
@@ -118,7 +113,6 @@ class Amalgam:
         execution_trace_file: str = "execution.trace",
         gc_interval: Optional[int] = None,
         library_postfix: Optional[str] = None,
-        max_num_threads: int = 0,
         sbf_datastore_enabled: bool = True,
         trace: Optional[bool] = None,
         **kwargs
@@ -169,7 +163,6 @@ class Amalgam:
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
         self.amlg = cdll.LoadLibrary(str(self.library_path))
         self.set_amlg_flags(sbf_datastore_enabled)
-        self.set_max_num_threads(max_num_threads)
         self.gc_interval = gc_interval
         self.op_count = 0
         self.load_command_log_entry = None
@@ -378,7 +371,7 @@ class Amalgam:
         self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
         self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
 
-    def get_max_num_threads(self, max_num_threads: int = 0) -> None:
+    def get_max_num_threads(self) -> None:
         """
         Get the maximum number of threads currently set.
 
