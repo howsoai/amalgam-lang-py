@@ -378,6 +378,22 @@ class Amalgam:
         self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
         self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
 
+    def get_max_num_threads(self, max_num_threads: int = 0) -> None:
+        """
+        Get the maximum number of threads currently set.
+
+        Returns
+        -------
+        int
+            The maximum number of threads that Amalgam is configured to use.
+        """
+        self.amlg.GetMaxNumThreads.restype = c_size_t
+        self._log_execution("GET_MAX_NUM_THREADS")
+        result = self.amlg.GetMaxNumThreads()
+        self._log_reply(result)
+
+        return result
+
     def set_max_num_threads(self, max_num_threads: int = 0) -> None:
         """
         Set the maximum number of threads.
@@ -393,7 +409,10 @@ class Amalgam:
         """
         self.amlg.SetMaxNumThreads.argtype = [c_size_t]
         self.amlg.SetMaxNumThreads.restype = c_void_p
-        self.amlg.SetMaxNumThreads(max_num_threads)
+
+        self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}")
+        result = self.amlg.SetMaxNumThreads(max_num_threads)
+        self._log_reply(result)
 
     def reset_trace(self, file: str) -> None:
         """
