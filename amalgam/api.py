@@ -380,7 +380,7 @@ class Amalgam:
         self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
         self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
 
-    def get_max_num_threads(self) -> None:
+    def get_max_num_threads(self) -> int:
         """
         Get the maximum number of threads currently set.
 
