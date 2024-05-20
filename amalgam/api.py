@@ -63,7 +63,7 @@ class Amalgam:
         appropriate library bundled with the package.
 
     append_trace_file : bool, default False
-        If True, new content will be appended to a tracefile if the file
+        If True, new content will be appended to a trace file if the file
         already exists rather than creating a new file.
 
     execution_trace_dir : Union[str, None], default None
@@ -87,12 +87,12 @@ class Amalgam:
         it within library_path. If neither are available, -mt (multi-threaded)
         will be used.
 
-    max_num_threads : int, default 0
+    max_num_threads : int or None, default None
         If a multithreaded Amalgam binary is used, sets the maximum number
         of threads to the value specified. If 0, will use the number of
-        visible logical cores.
+        visible logical cores. Default None will not attempt to set this value.
 
-    sbf_datastore_enabled : bool, default False
+    sbf_datastore_enabled : bool or None, default None
         If true, sbf tree structures are enabled.
 
     trace : bool, optional
@@ -118,8 +118,8 @@ class Amalgam:
         execution_trace_file: str = "execution.trace",
         gc_interval: Optional[int] = None,
         library_postfix: Optional[str] = None,
-        max_num_threads: int = 0,
-        sbf_datastore_enabled: bool = True,
+        max_num_threads: Optional[int] = None,
+        sbf_datastore_enabled: Optional[bool] = None,
         trace: Optional[bool] = None,
         **kwargs
     ):
@@ -168,8 +168,10 @@ class Amalgam:
         _logger.debug(f"Loading amalgam library: {self.library_path}")
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
         self.amlg = cdll.LoadLibrary(str(self.library_path))
-        self.set_amlg_flags(sbf_datastore_enabled)
-        self.set_max_num_threads(max_num_threads)
+        if sbf_datastore_enabled is not None:
+            self.set_amlg_flags(sbf_datastore_enabled)
+        if max_num_threads is not None:
+            self.set_max_num_threads(max_num_threads)
         self.gc_interval = gc_interval
         self.op_count = 0
         self.load_command_log_entry = None
@@ -378,7 +380,7 @@ class Amalgam:
         self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
         self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
 
-    def get_max_num_threads(self, max_num_threads: int = 0) -> None:
+    def get_max_num_threads(self) -> None:
         """
         Get the maximum number of threads currently set.
 
