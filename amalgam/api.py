@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ctypes import (
     byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure
+    cast, cdll, POINTER, Structure, _Pointer
 )
 from datetime import datetime
 import gc
@@ -42,11 +42,11 @@ class LoadEntityStatus:
     ----------
     api : Amalgam
         The Python Amalgam interface.
-    c_status : _LoadEntityStatus, default None
-        (Optional) _LoadEntityStatus instance.
+    c_status : _LoadEntityStatus, optional
+        _LoadEntityStatus instance.
     """
 
-    def __init__(self, api: Amalgam, c_status: _LoadEntityStatus | None = None):
+    def __init__(self, api: Amalgam, c_status: t.Optional[_LoadEntityStatus] = None):
         """Initialize LoadEntityStatus."""
         if c_status is None:
             self.loaded = True
@@ -77,8 +77,8 @@ class Amalgam:
 
     Parameters
     ----------
-    library_path : Path or str, default None
-        (Optional) Path to either the amalgam DLL, DyLib or SO (Windows, MacOS
+    library_path : Path or str, optional
+        Path to either the amalgam DLL, DyLib or SO (Windows, MacOS
         or Linux, respectively). If not specified it will build a path to the
         appropriate library bundled with the package.
 
@@ -86,20 +86,20 @@ class Amalgam:
         If True, new content will be appended to a trace file if the file
         already exists rather than creating a new file.
 
-    arch : str, default None
-        (Optional) The platform architecture of the embedded Amalgam library.
+    arch : str, optional
+        The platform architecture of the embedded Amalgam library.
         If not provided, it will be automatically detected.
         (Note: arm64_8a architecture must be manually specified!)
 
-    execution_trace_dir : str, default None
-        (Optional) A directory path for writing trace files. If ``None``, then
+    execution_trace_dir : str, optional
+        A directory path for writing trace files. If ``None``, then
         the current working directory will be used.
 
     execution_trace_file : str, default "execution.trace"
         The full or relative path to the execution trace used in debugging.
 
-    gc_interval : int, default None
-        (Optional) If set, garbage collection will be forced at the specified
+    gc_interval : int, optional
+        If set, garbage collection will be forced at the specified
         interval of amalgam operations. Note that this reduces memory
         consumption at the compromise of performance. Only use if models are
         exceeding your host's process memory limit or if paging to disk. As an
@@ -107,22 +107,22 @@ class Amalgam:
         operation), it results in a performance impact of 150x.
         Default value does not force garbage collection.
 
-    library_postfix : str, default None
-        (Optional) For configuring use of different amalgam builds i.e. -st for
+    library_postfix : str, optional
+        For configuring use of different amalgam builds i.e. -st for
         single-threaded. If not provided, an attempt will be made to detect
         it within library_path. If neither are available, -mt (multi-threaded)
         will be used.
 
-    max_num_threads : int, default None
-        (Optional) If a multithreaded Amalgam binary is used, sets the maximum
+    max_num_threads : int, optional
+        If a multithreaded Amalgam binary is used, sets the maximum
         number of threads to the value specified. If 0, will use the number of
         visible logical cores. Default None will not attempt to set this value.
 
-    sbf_datastore_enabled : bool, default None
-        (Optional) If true, sbf tree structures are enabled.
+    sbf_datastore_enabled : bool, optional
+        If true, sbf tree structures are enabled.
 
-    trace : bool, default None
-        (Optional) If true, enables execution trace file.
+    trace : bool, optional
+        If true, enables execution trace file.
 
     Raises
     ------
@@ -262,15 +262,15 @@ class Amalgam:
 
         Parameters
         ----------
-        library_path : Path or str, default None
-            (Optional) The path to the Amalgam shared library.
-        library_postfix : str, default None
-            (Optional) The library type as specified by a postfix to the word
+        library_path : Path or str, optional
+            The path to the Amalgam shared library.
+        library_postfix : str, optional
+            The library type as specified by a postfix to the word
             "amalgam" in the library's filename. E.g., the "-mt" in
             `amalgam-mt.dll`. If left unspecified, "-mt" will be used where
             supported, otherwise "-st".
-        arch : str, default None
-            (Optional) the platform architecture of the embedded Amalgam
+        arch : str, optional
+            The platform architecture of the embedded Amalgam
             library. If not provided, it will be automatically detected.
             (Note: arm64_8a architecture must be manually specified!)
 
@@ -586,8 +586,8 @@ class Amalgam:
         ----------
         value : str or bytes
             The value of the string.
-        size : int, default None
-            (Optional) The size of the string. If not provided, the length of
+        size : int, optional
+            The size of the string. If not provided, the length of
             the string is used.
 
         Returns
@@ -602,7 +602,7 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: POINTER(c_char)) -> bytes:
+    def char_p_to_bytes(self, p: _Pointer[c_char]) -> bytes:
         """
         Copy native C char pointer to bytes, cleaning up memory correctly.
 
