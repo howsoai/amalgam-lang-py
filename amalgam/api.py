@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from ctypes import (
-    byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure
+    byref, cast, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    cdll, POINTER, Structure
 )
 from datetime import datetime
 import gc
@@ -10,7 +8,7 @@ import logging
 from pathlib import Path
 import platform
 import re
-import typing as t
+from typing import Any, List, Optional, Tuple, Union
 import warnings
 
 # Set to amalgam
@@ -23,7 +21,6 @@ class _LoadEntityStatus(Structure):
 
     This is implemented with ctypes for accessing binary Amalgam builds.
     """
-
     _fields_ = [
         ("loaded", c_bool),
         ("message", POINTER(c_char)),
@@ -37,17 +34,8 @@ class LoadEntityStatus:
 
     This is implemented with python types and is meant to wrap _LoadEntityStatus
     which uses ctypes and directly interacts with the Amalgam binaries.
-
-    Parameters
-    ----------
-    api : Amalgam
-        The Python Amalgam interface.
-    c_status : _LoadEntityStatus, default None
-        (Optional) _LoadEntityStatus instance.
     """
-
-    def __init__(self, api: Amalgam, c_status: _LoadEntityStatus | None = None):
-        """Initialize LoadEntityStatus."""
+    def __init__(self, api, c_status: _LoadEntityStatus = None):
         if c_status is None:
             self.loaded = True
             self.message = ""
@@ -57,15 +45,7 @@ class LoadEntityStatus:
             self.message = api.char_p_to_bytes(c_status.message).decode("utf-8")
             self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
 
-    def __str__(self) -> str:
-        """
-        Return a human-readable string representation.
-
-        Returns
-        -------
-        str
-            The human-readable string representation.
-        """
+    def __str__(self):
         return f"{self.loaded},\"{self.message}\",\"{self.version}\""
 
 
@@ -77,52 +57,46 @@ class Amalgam:
 
     Parameters
     ----------
-    library_path : Path or str, default None
-        (Optional) Path to either the amalgam DLL, DyLib or SO (Windows, MacOS
-        or Linux, respectively). If not specified it will build a path to the
+    library_path : Path or str
+        Path to either the amalgam DLL, DyLib or SO (Windows, MacOS or
+        Linux, respectively). If not specified it will build a path to the
         appropriate library bundled with the package.
 
     append_trace_file : bool, default False
         If True, new content will be appended to a trace file if the file
         already exists rather than creating a new file.
 
-    arch : str, default None
-        (Optional) The platform architecture of the embedded Amalgam library.
-        If not provided, it will be automatically detected.
-        (Note: arm64_8a architecture must be manually specified!)
-
-    execution_trace_dir : str, default None
-        (Optional) A directory path for writing trace files. If ``None``, then
-        the current working directory will be used.
+    execution_trace_dir : Union[str, None], default None
+        A directory path for writing trace files.
 
     execution_trace_file : str, default "execution.trace"
         The full or relative path to the execution trace used in debugging.
 
     gc_interval : int, default None
-        (Optional) If set, garbage collection will be forced at the specified
-        interval of amalgam operations. Note that this reduces memory
-        consumption at the compromise of performance. Only use if models are
-        exceeding your host's process memory limit or if paging to disk. As an
-        example, if this operation is set to 0 (force garbage collection every
-        operation), it results in a performance impact of 150x.
+        If set, garbage collection will be forced at the specified interval
+        of amalgam operations. Note that this reduces memory consumption at
+        the compromise of performance. Only use if models are exceeding
+        your host's process memory limit or if paging to disk. As an
+        example, if this operation is set to 0 (force garbage collection
+        every operation), it results in a performance impact of 150x.
         Default value does not force garbage collection.
 
-    library_postfix : str, default None
-        (Optional) For configuring use of different amalgam builds i.e. -st for
+    library_postfix : str, optional
+        For configuring use of different amalgam builds i.e. -st for
         single-threaded. If not provided, an attempt will be made to detect
         it within library_path. If neither are available, -mt (multi-threaded)
         will be used.
 
-    max_num_threads : int, default None
-        (Optional) If a multithreaded Amalgam binary is used, sets the maximum
-        number of threads to the value specified. If 0, will use the number of
+    max_num_threads : int or None, default None
+        If a multithreaded Amalgam binary is used, sets the maximum number
+        of threads to the value specified. If 0, will use the number of
         visible logical cores. Default None will not attempt to set this value.
 
-    sbf_datastore_enabled : bool, default None
-        (Optional) If true, sbf tree structures are enabled.
+    sbf_datastore_enabled : bool or None, default None
+        If true, sbf tree structures are enabled.
 
-    trace : bool, default None
-        (Optional) If true, enables execution trace file.
+    trace : bool, optional
+        If true, enables execution trace file.
 
     Raises
     ------
@@ -136,20 +110,19 @@ class Amalgam:
 
     def __init__(  # noqa: C901
         self,
-        library_path: t.Optional[Path | str] = None,
+        library_path: Optional[Union[Path, str]] = None,
         *,
-        arch: t.Optional[str] = None,
+        arch: Optional[str] = None,
         append_trace_file: bool = False,
-        execution_trace_dir: t.Optional[str] = None,
+        execution_trace_dir: Optional[str] = None,
         execution_trace_file: str = "execution.trace",
-        gc_interval: t.Optional[int] = None,
-        library_postfix: t.Optional[str] = None,
-        max_num_threads: t.Optional[int] = None,
-        sbf_datastore_enabled: t.Optional[bool] = None,
-        trace: t.Optional[bool] = None,
+        gc_interval: Optional[int] = None,
+        library_postfix: Optional[str] = None,
+        max_num_threads: Optional[int] = None,
+        sbf_datastore_enabled: Optional[bool] = None,
+        trace: Optional[bool] = None,
         **kwargs
     ):
-        """Initialize Amalgam instance."""
         if len(kwargs):
             warnings.warn(f'Unexpected keyword arguments '
                           f'[{", ".join(list(kwargs.keys()))}] '
@@ -204,7 +177,7 @@ class Amalgam:
         self.load_command_log_entry = None
 
     @classmethod
-    def _get_allowed_postfixes(cls, library_dir: Path) -> list[str]:
+    def _get_allowed_postfixes(cls, library_dir: Path) -> List[str]:
         """
         Return list of all library postfixes allowed given library directory.
 
@@ -226,7 +199,7 @@ class Amalgam:
         return list(allowed_postfixes)
 
     @classmethod
-    def _parse_postfix(cls, filename: str) -> str | None:
+    def _parse_postfix(cls, filename: str) -> Union[str, None]:
         """
         Determine library postfix given a filename.
 
@@ -249,10 +222,10 @@ class Amalgam:
     @classmethod
     def _get_library_path(
         cls,
-        library_path: t.Optional[Path | str] = None,
-        library_postfix: t.Optional[str] = None,
-        arch: t.Optional[str] = None
-    ) -> tuple[Path, str]:
+        library_path: Optional[Union[Path, str]] = None,
+        library_postfix: Optional[str] = None,
+        arch: Optional[str] = None
+    ) -> Tuple[Path, str]:
         """
         Return the full Amalgam library path and its library_postfix.
 
@@ -263,14 +236,13 @@ class Amalgam:
         Parameters
         ----------
         library_path : Path or str, default None
-            (Optional) The path to the Amalgam shared library.
-        library_postfix : str, default None
-            (Optional) The library type as specified by a postfix to the word
+            Optional, The path to the Amalgam shared library.
+        library_postfix : str, default "-mt"
+            Optional, The library type as specified by a postfix to the word
             "amalgam" in the library's filename. E.g., the "-mt" in
-            `amalgam-mt.dll`. If left unspecified, "-mt" will be used where
-            supported, otherwise "-st".
+            `amalgam-mt.dll`.
         arch : str, default None
-            (Optional) the platform architecture of the embedded Amalgam
+            Optional, the platform architecture of the embedded Amalgam
             library. If not provided, it will be automatically detected.
             (Note: arm64_8a architecture must be manually specified!)
 
@@ -395,7 +367,7 @@ class Amalgam:
         self.amlg.IsSBFDataStoreEnabled.restype = c_bool
         return self.amlg.IsSBFDataStoreEnabled()
 
-    def set_amlg_flags(self, sbf_datastore_enabled: bool = True):
+    def set_amlg_flags(self, sbf_datastore_enabled: bool = True) -> None:
         """
         Set various amalgam flags for data structure and compute features.
 
@@ -424,7 +396,7 @@ class Amalgam:
 
         return result
 
-    def set_max_num_threads(self, max_num_threads: int = 0):
+    def set_max_num_threads(self, max_num_threads: int = 0) -> None:
         """
         Set the maximum number of threads.
 
@@ -444,7 +416,7 @@ class Amalgam:
         result = self.amlg.SetMaxNumThreads(max_num_threads)
         self._log_reply(result)
 
-    def reset_trace(self, file: str):
+    def reset_trace(self, file: str) -> None:
         """
         Close the open trace file and opens a new one with the specified name.
 
@@ -480,11 +452,11 @@ class Amalgam:
         self.trace.flush()
 
     def __str__(self) -> str:
-        """Return a human-readable string representation."""
+        """Implement the str() method."""
         return (f"Amalgam Path:\t\t {self.library_path}\n"
                 f"Amalgam GC Interval:\t {self.gc_interval}\n")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Implement a "destructor" method to finalize log files, if any."""
         if (
             getattr(self, 'debug', False) and
@@ -495,7 +467,7 @@ class Amalgam:
             except Exception:  # noqa - deliberately broad
                 pass
 
-    def _log_comment(self, comment: str):
+    def _log_comment(self, comment: str) -> None:
         """
         Log a comment into the execution trace file.
 
@@ -510,7 +482,7 @@ class Amalgam:
             self.trace.write("# NOTE >" + str(comment) + "\n")
             self.trace.flush()
 
-    def _log_reply(self, reply: t.Any):
+    def _log_reply(self, reply: Any) -> None:
         """
         Log a raw reply from the amalgam process.
 
@@ -525,9 +497,9 @@ class Amalgam:
             self.trace.write("# RESULT >" + str(reply) + "\n")
             self.trace.flush()
 
-    def _log_time(self, label: str):
+    def _log_time(self, label: str) -> None:
         """
-        Log a labelled timestamp to the trace file.
+        Log a labelled timestamp to the tracefile.
 
         Parameters
         ----------
@@ -540,7 +512,7 @@ class Amalgam:
                              f"{f'{dt:%f}'[:3]}\n")
             self.trace.flush()
 
-    def _log_execution(self, execution_string: str):
+    def _log_execution(self, execution_string: str) -> None:
         """
         Log an execution string.
 
@@ -561,7 +533,7 @@ class Amalgam:
             self.trace.write(execution_string + "\n")
             self.trace.flush()
 
-    def gc(self):
+    def gc(self) -> None:
         """Force garbage collection when called if self.force_gc is set."""
         if (
             self.gc_interval is not None
@@ -574,8 +546,8 @@ class Amalgam:
 
     def str_to_char_p(
         self,
-        value: str | bytes,
-        size: t.Optional[int] = None
+        value: Union[str, bytes],
+        size: Optional[int] = None
     ) -> c_char:
         """
         Convert a string to a C char pointer.
@@ -586,9 +558,9 @@ class Amalgam:
         ----------
         value : str or bytes
             The value of the string.
-        size : int, default None
-            (Optional) The size of the string. If not provided, the length of
-            the string is used.
+        size : int or None
+            The size of the string. If not provided, the length of the
+            string is used.
 
         Returns
         -------
@@ -604,11 +576,11 @@ class Amalgam:
 
     def char_p_to_bytes(self, p: POINTER(c_char)) -> bytes:
         """
-        Copy native C char pointer to bytes, cleaning up memory correctly.
+        Copies a native C char pointer to bytes, cleaning up native memory correctly.
 
         Parameters
         ----------
-        p : POINTER(c_char)
+        p : LP_char_p
             C pointer to string to convert
 
         Returns
@@ -662,8 +634,8 @@ class Amalgam:
         self,
         handle: str,
         label: str,
-        json: str | bytes
-    ):
+        json: Union[str, bytes]
+    ) -> None:
         """
         Set a label in amalgam using json.
 
@@ -870,9 +842,9 @@ class Amalgam:
         *,
         update_persistence_location: bool = False,
         store_contained: bool = False
-    ):
+    ) -> None:
         """
-        Store entity to the file type specified within amlg_path.
+        Stores an entity to the file type specified within amlg_path.
 
         Parameters
         ----------
@@ -908,7 +880,7 @@ class Amalgam:
     def destroy_entity(
         self,
         handle: str
-    ):
+    ) -> None:
         """
         Destroys an entity.
 
@@ -933,7 +905,7 @@ class Amalgam:
         rand_seed: str
     ) -> bool:
         """
-        Set entity's random seed.
+        Sets an entity's random seed.
 
         Parameters
         ----------
@@ -963,7 +935,7 @@ class Amalgam:
         self.gc()
         return result
 
-    def get_entities(self) -> list[str]:
+    def get_entities(self) -> List[str]:
         """
         Get loaded top level entities.
 
@@ -988,7 +960,7 @@ class Amalgam:
         self,
         handle: str,
         label: str,
-        json: str | bytes
+        json: Union[str, bytes]
     ) -> bytes:
         """
         Execute a label with parameters provided in json format.
@@ -1032,7 +1004,7 @@ class Amalgam:
 
         return result
 
-    def set_number_value(self, handle: str, label: str, value: float):
+    def set_number_value(self, handle: str, label: str, value: float) -> None:
         """
         Set a numeric value to a label in an amalgam entity.
 
@@ -1090,8 +1062,8 @@ class Amalgam:
         self,
         handle: str,
         label: str,
-        value: str | bytes
-    ):
+        value: Union[str, bytes]
+    ) -> None:
         """
         Set a string value to a label in an amalgam entity.
 
@@ -1117,7 +1089,7 @@ class Amalgam:
         del val_buf
         self.gc()
 
-    def get_string_value(self, handle: str, label: str) -> bytes | None:
+    def get_string_value(self, handle: str, label: str) -> Union[bytes, None]:
         """
         Retrieve a string value from a label in an amalgam entity.
 
@@ -1155,8 +1127,8 @@ class Amalgam:
         self,
         handle: str,
         label: str,
-        value: list[str | bytes]
-    ):
+        value: List[Union[str, bytes]]
+    ) -> None:
         """
         Set a list of strings to an amalgam entity.
 
@@ -1190,7 +1162,7 @@ class Amalgam:
         del value_buf
         self.gc()
 
-    def get_string_list(self, handle: str, label: str) -> list[bytes]:
+    def get_string_list(self, handle: str, label: str) -> List[bytes]:
         """
         Retrieve a list of numbers from a label in an amalgam entity.
 
@@ -1260,7 +1232,7 @@ class Amalgam:
     @staticmethod
     def escape_double_quotes(s: str) -> str:
         """
-        Get the string with backslashes preceding contained double quotes.
+        Get the string with backslashes preceeding contained double quotes.
 
         Parameters
         ----------
