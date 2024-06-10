@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from ctypes import (
-    byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure, _Pointer
+    _Pointer, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    cast, cdll, POINTER, Structure
 )
 from datetime import datetime
 import gc
