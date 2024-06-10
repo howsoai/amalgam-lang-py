@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ctypes import (
-    _Pointer, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
     cast, cdll, POINTER, Structure
 )
 from datetime import datetime
@@ -576,7 +576,7 @@ class Amalgam:
         self,
         value: str | bytes,
         size: t.Optional[int] = None
-    ) -> c_char:
+    ) -> Array[c_char]:
         """
         Convert a string to a C char pointer.
 
@@ -602,7 +602,7 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: _Pointer[c_char]) -> bytes:
+    def char_p_to_bytes(self, p: _Pointer[c_char]) -> bytes | None:
         """
         Copy native C char pointer to bytes, cleaning up memory correctly.
 
@@ -613,16 +613,16 @@ class Amalgam:
 
         Returns
         -------
-        bytes
+        bytes_string
             The byte-encoded string from C pointer
         """
-        bytes = cast(p, c_char_p).value
+        bytes_str = cast(p, c_char_p).value
 
         self.amlg.DeleteString.argtypes = c_char_p,
         self.amlg.DeleteString.restype = None
         self.amlg.DeleteString(p)
 
-        return bytes
+        return bytes_str
 
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
