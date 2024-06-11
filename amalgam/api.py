@@ -602,21 +602,21 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: c_char) -> bytes | None:
+    def char_p_to_bytes(self, p: c_char_p) -> bytes | None:
         """
-        Copy native C char to bytes, cleaning up memory correctly.
+        Copy native C char pointer to bytes, cleaning up memory correctly.
 
         Parameters
         ----------
-        p : c_char
-            The char to convert
+        p : c_char_p
+            The char pointer to convert
 
         Returns
         -------
         bytes or None
             The byte-encoded char
         """
-        bytes_str = cast(p, c_char_p).value
+        bytes_str = p.value
 
         self.amlg.DeleteString.argtypes = c_char_p,
         self.amlg.DeleteString.restype = None
