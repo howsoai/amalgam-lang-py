@@ -404,7 +404,7 @@ class Amalgam:
         sbf_datastore_enabled : bool, default True
             If true, sbf tree structures are enabled.
         """
-        self.amlg.SetSBFDataStoreEnabled.argtype = [c_bool]
+        self.amlg.SetSBFDataStoreEnabled.argtypes = [c_bool]
         self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
         self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
 
@@ -437,7 +437,7 @@ class Amalgam:
             of threads to the value specified. If 0, will use the number of
             visible logical cores.
         """
-        self.amlg.SetMaxNumThreads.argtype = [c_size_t]
+        self.amlg.SetMaxNumThreads.argtypes = [c_size_t]
         self.amlg.SetMaxNumThreads.restype = c_void_p
 
         self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}")
@@ -578,7 +578,7 @@ class Amalgam:
         size: t.Optional[int] = None
     ) -> Array[c_char]:
         """
-        Convert a string to a C char pointer.
+        Convert a string to an Array of C char.
 
         User must call `del` on returned buffer
 
@@ -592,8 +592,8 @@ class Amalgam:
 
         Returns
         -------
-        c_char
-            A C char pointer for the string.
+        Array of c_char
+            An Array of C char datatypes which form the given string
         """
         if isinstance(value, str):
             value = value.encode('utf-8')
@@ -602,19 +602,19 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: _Pointer[c_char]) -> bytes | None:
+    def char_p_to_bytes(self, p: c_char) -> bytes | None:
         """
-        Copy native C char pointer to bytes, cleaning up memory correctly.
+        Copy native C char to bytes, cleaning up memory correctly.
 
         Parameters
         ----------
-        p : POINTER(c_char)
-            C pointer to string to convert
+        p : c_char
+            The char to convert
 
         Returns
         -------
         bytes or None
-            The byte-encoded string from C pointer
+            The byte-encoded char
         """
         bytes_str = cast(p, c_char_p).value
 
@@ -641,7 +641,7 @@ class Amalgam:
             The byte-encoded json representation of the amalgam label.
         """
         self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
-        self.amlg.GetJSONPtrFromLabel.argtype = [c_char_p, c_char_p]
+        self.amlg.GetJSONPtrFromLabel.argtypes = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
@@ -677,7 +677,7 @@ class Amalgam:
             The json representation of the label value.
         """
         self.amlg.SetJSONToLabel.restype = c_void_p
-        self.amlg.SetJSONToLabel.argtype = [c_char_p, c_char_p, c_char_p]
+        self.amlg.SetJSONToLabel.argtypes = [c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
@@ -738,7 +738,7 @@ class Amalgam:
         LoadEntityStatus
             Status of LoadEntity call.
         """
-        self.amlg.LoadEntity.argtype = [
+        self.amlg.LoadEntity.argtypes = [
             c_char_p, c_char_p, c_bool, c_bool, c_bool, c_bool, c_char_p, c_char_p]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
@@ -785,7 +785,7 @@ class Amalgam:
         LoadEntityStatus
             Status of VerifyEntity call.
         """
-        self.amlg.VerifyEntity.argtype = [c_char_p]
+        self.amlg.VerifyEntity.argtypes = [c_char_p]
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
         amlg_path_buf = self.str_to_char_p(amlg_path)
 
@@ -834,7 +834,7 @@ class Amalgam:
         bool
             True if cloned successfully, False if not.
         """
-        self.amlg.CloneEntity.argtype = [
+        self.amlg.CloneEntity.argtypes = [
             c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         clone_handle_buf = self.str_to_char_p(clone_handle)
@@ -885,7 +885,7 @@ class Amalgam:
         store_contained : bool
             If set to true, contained entities will be stored.
         """
-        self.amlg.StoreEntity.argtype = [
+        self.amlg.StoreEntity.argtypes = [
             c_char_p, c_char_p, c_bool, c_bool]
         handle_buf = self.str_to_char_p(handle)
         amlg_path_buf = self.str_to_char_p(amlg_path)
@@ -917,7 +917,7 @@ class Amalgam:
         handle : str
             The handle of the amalgam entity.
         """
-        self.amlg.DestroyEntity.argtype = [c_char_p]
+        self.amlg.DestroyEntity.argtypes = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
 
         self._log_execution(f"DESTROY_ENTITY \"{self.escape_double_quotes(handle)}\"")
@@ -947,7 +947,7 @@ class Amalgam:
         bool
             True if the set was successful, false if not.
         """
-        self.amlg.SetRandomSeed.argtype = [c_char_p, c_char_p]
+        self.amlg.SetRandomSeed.argtypes = [c_char_p, c_char_p]
         self.amlg.SetRandomSeed.restype = c_bool
 
         handle_buf = self.str_to_char_p(handle)
@@ -972,7 +972,7 @@ class Amalgam:
         list of str
             The list of entity handles.
         """
-        self.amlg.GetEntities.argtype = [POINTER(c_uint64)]
+        self.amlg.GetEntities.argtypes = [POINTER(c_uint64)]
         self.amlg.GetEntities.restype = POINTER(c_char_p)
         num_entities = c_uint64()
         entities = self.amlg.GetEntities(byref(num_entities))
@@ -1008,7 +1008,7 @@ class Amalgam:
             A byte-encoded json representation of the response.
         """
         self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
-        self.amlg.ExecuteEntityJsonPtr.argtype = [
+        self.amlg.ExecuteEntityJsonPtr.argtypes = [
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
@@ -1046,7 +1046,7 @@ class Amalgam:
             A numeric value to assign to a label.
         """
         self.amlg.SetNumberValue.restype = c_void_p
-        self.amlg.SetNumberValue.argtype = [c_char_p, c_char_p, c_double]
+        self.amlg.SetNumberValue.argtypes = [c_char_p, c_char_p, c_double]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         val = c_double(value)
@@ -1075,7 +1075,7 @@ class Amalgam:
             The numeric value of the label.
         """
         self.amlg.GetNumberValue.restype = c_double
-        self.amlg.GetNumberValue.argtype = [c_char_p, c_char_p]
+        self.amlg.GetNumberValue.argtypes = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
@@ -1105,7 +1105,7 @@ class Amalgam:
             A string value.
         """
         self.amlg.SetStringValue.restype = c_void_p
-        self.amlg.SetStringValue.argtype = [c_char_p, c_char_p, c_char_p]
+        self.amlg.SetStringValue.argtypes = [c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         val_buf = self.str_to_char_p(value)
@@ -1134,7 +1134,7 @@ class Amalgam:
             The byte-encoded string value of the label in the amalgam entity.
         """
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
-        self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
+        self.amlg.GetStringListPtr.argtypes = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
@@ -1170,7 +1170,7 @@ class Amalgam:
             A 1d list of string values.
         """
         self.amlg.SetStringList.restype = c_void_p
-        self.amlg.SetStringList.argtype = [
+        self.amlg.SetStringList.argtypes = [
             c_char_p, c_char_p, POINTER(c_char_p), c_size_t]
 
         size = len(value)
@@ -1208,9 +1208,9 @@ class Amalgam:
             amalgam entity.
         """
         self.amlg.GetStringListLength.restype = c_size_t
-        self.amlg.GetStringListLength.argtype = [c_char_p, c_char_p]
+        self.amlg.GetStringListLength.argtypes = [c_char_p, c_char_p]
         self.amlg.GetStringListPtr.restype = POINTER(c_char_p)
-        self.amlg.GetStringListPtr.argtype = [c_char_p, c_char_p]
+        self.amlg.GetStringListPtr.argtypes = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
