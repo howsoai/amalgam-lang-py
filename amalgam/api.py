@@ -613,7 +613,7 @@ class Amalgam:
 
         Returns
         -------
-        bytes_string
+        bytes or None
             The byte-encoded string from C pointer
         """
         bytes_str = cast(p, c_char_p).value
