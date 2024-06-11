@@ -618,7 +618,7 @@ class Amalgam:
         """
         bytes_str = p.value
 
-        self.amlg.DeleteString.argtypes = c_char_p,
+        self.amlg.DeleteString.argtypes = [c_char_p]
         self.amlg.DeleteString.restype = None
         self.amlg.DeleteString(p)
 
