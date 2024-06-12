@@ -602,7 +602,7 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: _Pointer[c_char_p] | c_char_p) -> bytes | None:
+    def char_p_to_bytes(self, p: _Pointer[c_char] | c_char_p) -> bytes | None:
         """
         Copy native C char pointer to bytes, cleaning up memory correctly.
 
