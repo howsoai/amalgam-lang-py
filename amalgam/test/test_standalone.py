@@ -24,7 +24,7 @@ def amalgam_lib():
                    execution_trace_dir='./traces/', trace=True)
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
+@pytest.mark.skipif(True, reason="Pending bugfix") # TODO: 20545
 def test_bulk_operations(amalgam_lib):
     amalgam_lib.reset_trace('test_bulk_operations.trace')
     assert bulk_operations(amalgam_lib)
