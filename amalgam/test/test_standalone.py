@@ -12,7 +12,7 @@ from amalgam.api import Amalgam
 
 _logger = logging.getLogger(__name__)
 
-amlg_postfix = '-mt' if '-mt' in os.getenv('HOWSO_CONFIG', '') else '-st'
+amlg_postfix = '-mt' if '-mt' in os.getenv('AMALGAM_LIBRARY_POSTFIX', '') else '-st'
 amlg_path, _ = Amalgam._get_library_path(library_postfix=amlg_postfix)
 _logger.debug(f'Amalgam path: ', {amlg_path})
 is_amalgam_installed = amlg_path.exists()
