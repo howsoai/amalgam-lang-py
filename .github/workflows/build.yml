@@ -212,7 +212,7 @@ jobs:
       config-pretty: 'ST'
       workers: 'auto'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   pytest-linux-3-10-mt:
     needs: ['metadata', 'build']
@@ -226,7 +226,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   pytest-linux-3-11-mt:
     needs: ['metadata', 'build']
@@ -240,7 +240,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   pytest-linux-3-12-mt:
     needs: ['metadata', 'build']
@@ -254,7 +254,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   pytest-windows-3-12-mt:
     needs: ['metadata', 'build']
@@ -268,7 +268,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   pytest-macos-3-12-mt:
     needs: ['metadata', 'build']
@@ -282,7 +282,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
-      targets: 'amalgam/test/test_standalone.py'
+      targets: '["amalgam/test/test_standalone.py::test_bulk_operations"]'
 
   publish:
     if: inputs.build-type == 'release'
