@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ctypes import (
-    Array, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
     cast, cdll, POINTER, Structure
 )
 from datetime import datetime
@@ -602,7 +602,7 @@ class Amalgam:
         buf.value = value
         return buf
 
-    def char_p_to_bytes(self, p: c_char_p) -> bytes | None:
+    def char_p_to_bytes(self, p: _Pointer[c_char_p] | c_char_p) -> bytes | None:
         """
         Copy native C char pointer to bytes, cleaning up memory correctly.
 
@@ -616,7 +616,7 @@ class Amalgam:
         bytes or None
             The byte-encoded char
         """
-        bytes_str = p.value
+        bytes_str = cast(p, c_char_p).value
 
         self.amlg.DeleteString.argtypes = [c_char_p]
         self.amlg.DeleteString.restype = None

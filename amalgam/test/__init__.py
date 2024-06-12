@@ -18,13 +18,3 @@ def get_test_options():
     except (AttributeError, ValueError):
         options = []
     return options
-
-
-if platform.system() == 'Windows':
-    amalgam_binary = 'amalgam.dll'
-elif platform.system() == 'Darwin':
-    amalgam_binary = 'amalgam.dylib'
-else:
-    amalgam_binary = 'amalgam.so'
-
-amalgam_path = Path(Path.home(), '.howso', 'lib', 'dev', 'amlg', 'lib', amalgam_binary)

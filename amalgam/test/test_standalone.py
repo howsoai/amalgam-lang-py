@@ -9,17 +9,17 @@ import pytest
 
 import amalgam
 from amalgam.api import Amalgam
-from amalgam.test import amalgam_path
 
 _logger = logging.getLogger(__name__)
 
-
-is_amalgam_installed = os.path.exists(amalgam_path)
+amlg_postfix = '-mt' if '-mt' in os.getenv('HOWSO_CONFIG') else '-st'
+amlg_path, _ = Amalgam._get_library_path(library_postfix=amlg_postfix)
+is_amalgam_installed = amlg_path.exists()
 
 
 @pytest.fixture
 def amalgam_lib():
-    return Amalgam(library_path=amalgam_path, gc_interval=1000,
+    return Amalgam(library_path=amlg_path, gc_interval=1000,
                    execution_trace_dir='./traces/', trace=True)
 
 
