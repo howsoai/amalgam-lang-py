@@ -212,6 +212,7 @@ jobs:
       config-pretty: 'ST'
       workers: 'auto'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   pytest-linux-3-10-mt:
     needs: ['metadata', 'build']
@@ -225,6 +226,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   pytest-linux-3-11-mt:
     needs: ['metadata', 'build']
@@ -238,6 +240,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   pytest-linux-3-12-mt:
     needs: ['metadata', 'build']
@@ -251,6 +254,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   pytest-windows-3-12-mt:
     needs: ['metadata', 'build']
@@ -264,6 +268,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   pytest-macos-3-12-mt:
     needs: ['metadata', 'build']
@@ -277,6 +282,7 @@ jobs:
       config-fp: './config/latest-mt-debug-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      targets: 'amalgam/test/test_standalone.py'
 
   publish:
     if: inputs.build-type == 'release'
