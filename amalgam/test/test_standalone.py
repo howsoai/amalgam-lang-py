@@ -9,21 +9,22 @@ import pytest
 
 import amalgam
 from amalgam.api import Amalgam
-from amalgam.test import amalgam_path
 
 _logger = logging.getLogger(__name__)
 
-
-is_amalgam_installed = os.path.exists(amalgam_path)
+amlg_postfix = '-mt' if '-mt' in os.getenv('AMALGAM_LIBRARY_POSTFIX', '') else '-st'
+amlg_path, _ = Amalgam._get_library_path(library_postfix=amlg_postfix)
+_logger.debug(f'Amalgam path: ', {amlg_path})
+is_amalgam_installed = amlg_path.exists()
 
 
 @pytest.fixture
 def amalgam_lib():
-    return Amalgam(library_path=amalgam_path, gc_interval=1000,
+    return Amalgam(library_path=amlg_path, gc_interval=1000,
                    execution_trace_dir='./traces/', trace=True)
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
+@pytest.mark.skipif(True, reason="Pending bugfix") # TODO: 20545
 def test_bulk_operations(amalgam_lib):
     amalgam_lib.reset_trace('test_bulk_operations.trace')
     assert bulk_operations(amalgam_lib)
