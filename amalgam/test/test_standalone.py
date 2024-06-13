@@ -67,12 +67,6 @@ def bulk_operations(amlg):
         start = dt.datetime.now()
         i = 0
         while ops_per_round * 10 > i:
-            amlg.set_number_value(handle, label, random.random())
-            amlg.get_number_value(handle, label)
-            amlg.set_string_value(handle, label, "Hello World!")
-            amlg.get_string_value(handle, label)
-            amlg.set_string_list(handle, label, ["hello", "world"])
-            amlg.get_string_list(handle, label)
             amlg.set_json_to_label(
                 handle, label, json.dumps(["hello", "world"]))
             amlg.get_json_from_label(handle, label)
