@@ -53,6 +53,11 @@ The wrapper handles the Amalgam language binary (so/dll/dylib) automatically for
 amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 ```
 
+## Testing
+There is a `Pytest` unit test suite located in `amalgam/test`. The tests in `test_standalone.py` will only execute if an `Amalgam` binary is located in the default expected path of `amalgam/lib/{os}/{architecture}`.
+
+To specify whether `test_standalone.py` should use single-threaded or multi-threaded `Amalgam` (assuming the appropriate binary is in the above path), set the `AMALGAM_LIBRARY_POSTFIX` environment variable to the desired postfix, e.g., `-st` or `-mt`.
+
 ## License
 
 [License](LICENSE.txt)
