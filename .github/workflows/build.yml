@@ -14,6 +14,11 @@ on:
             '57.0.1'
         required: false
         type: string
+      debug-mode:
+        description: Enables GDB and Amalgam Fast Memory Integrity checks for all Linux/x86 Pytest jobs.
+        type: boolean
+        required: false
+        default: false
   workflow_call:
     inputs:
       build-type:
@@ -22,6 +27,10 @@ on:
       optional-release-tag:
         required: false
         type: string
+      debug-mode:
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -208,10 +217,11 @@ jobs:
       platform-pretty: 'Linux'
       amalgam-plat-arch: 'linux-amd64'
       python-version: '3.9'
-      config-fp: './config/latest-st-debug-howso.yml'
+      config-fp: './config/latest-st-traces-howso.yml'
       config-pretty: 'ST'
       workers: 'auto'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      debug: ${{ inputs.debug-mode }}
 
   pytest-linux-3-12-mt:
     needs: ['metadata', 'build']
@@ -222,9 +232,10 @@ jobs:
       platform-pretty: 'Linux'
       amalgam-plat-arch: 'linux-amd64'
       python-version: '3.12'
-      config-fp: './config/latest-mt-debug-howso.yml'
+      config-fp: './config/latest-mt-traces-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      debug: ${{ inputs.debug-mode }}
 
   pytest-windows-3-12-mt:
     needs: ['metadata', 'build']
@@ -235,22 +246,24 @@ jobs:
       platform-pretty: 'Windows'
       amalgam-plat-arch: 'windows-amd64'
       python-version: '3.12'
-      config-fp: './config/latest-mt-debug-howso.yml'
+      config-fp: './config/latest-mt-traces-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      debug: ${{ inputs.debug-mode }}
 
   pytest-macos-3-12-mt:
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
-      platform: 'macos-latest-xlarge'
+      platform: 'macos-latest'
       platform-pretty: 'MacOS'
       amalgam-plat-arch: 'darwin-arm64'
       python-version: '3.12'
-      config-fp: './config/latest-mt-debug-howso.yml'
+      config-fp: './config/latest-mt-traces-howso.yml'
       config-pretty: 'MT'
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      debug: ${{ inputs.debug-mode }}
 
   publish:
     if: inputs.build-type == 'release'
