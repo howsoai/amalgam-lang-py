@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "amalgam-lang"
 dynamic = ["version"]
 readme = "README.md"
-description = "A direct interface with Amalgam compiled DLL or so."
+description = "A direct interface with Amalgam compiled DLL, dylib, or so."
 authors = [
     {name = "Howso Incorporated"},
     {email = "support@howso.com"},
@@ -15,7 +15,7 @@ requires-python = ">=3.9"
 keywords = ["machine", "learning", "artificial", "intelligence"]
 license = {file = "LICENSE.txt"}
 classifiers = [
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "License :: OSI Approved :: GNU Affero General Public License v3",
@@ -37,7 +37,6 @@ dev = [
    "flake8",
    "flake8-docstrings",
    "flake8-import-order",
-   "pip-tools",
    "pytest",
    "pytest-cov",
    "pytest-mock",
