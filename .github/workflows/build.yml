@@ -341,6 +341,16 @@ jobs:
           find ./tmp -type f -name '*.tar.gz' -exec mv -t ./dist {} +
           ls ./dist
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: Wandalen/wretry.action@master
+        with:
+          action: pypa/gh-action-pypi-publish@release/v1
+          attempt_limit: 3
+
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
@@ -352,11 +362,3 @@ jobs:
           makeLatest: legacy
           artifacts: "dist/*"
           artifactContentType: application/gzip
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
