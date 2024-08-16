@@ -346,11 +346,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: Wandalen/wretry.action@master
-        with:
-          action: pypa/gh-action-pypi-publish@release/v1
-          attempt_limit: 3
-
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
