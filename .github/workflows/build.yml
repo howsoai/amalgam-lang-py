@@ -318,6 +318,7 @@ jobs:
       - pytest-linux-3-12-mt
       - pytest-macos-3-12-mt
       - pytest-windows-3-12-mt
+      - publish
     runs-on: ubuntu-latest
     environment:
       name: pypi
