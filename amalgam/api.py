@@ -698,12 +698,11 @@ class Amalgam:
     def load_entity(
         self,
         handle: str,
-        amlg_path: str,
+        file_path: str,
         *,
+        file_type: str = "",
         persist: bool = False,
-        load_contained: bool = False,
-        escape_filename: bool = False,
-        escape_contained_filenames: bool = True,
+        json_file_params: str = "",
         write_log: str = "",
         print_log: str = ""
     ) -> LoadEntityStatus:
@@ -714,18 +713,17 @@ class Amalgam:
         ----------
         handle : str
             The handle to assign the entity.
-        amlg_path : str
-            The path to the filename.amlg/caml file.
+        file_path : str
+            The path of the file name to load.
+        file_type : str, default ""
+            If set to a nonempty string, will represent the type of file to load.
         persist : bool, default False
-            If set to true, all transactions will trigger the entity to be
-            saved over the original source.
-        load_contained : bool, default False
-            If set to true, contained entities will be loaded.
-        escape_filename : bool, default False
-            If set to true, the filename will be aggressively escaped.
-        escape_contained_filenames : bool, default True
-            If set to true, the filenames of contained entities will be
-            aggressively escaped.
+            If set to true, all transactions that update the entity will also be
+            written to the files.
+        json_file_params : str, default ""
+            Either empty string or a string of json specifying a set of key-value pairs
+            which are parameters specific to the file type.  See Amalgam documentation
+            for details of allowed parameters.
         write_log : str, default ""
             Path to the write log. If empty string, the write log is
             not generated.
@@ -739,29 +737,32 @@ class Amalgam:
             Status of LoadEntity call.
         """
         self.amlg.LoadEntity.argtypes = [
-            c_char_p, c_char_p, c_bool, c_bool, c_bool, c_bool, c_char_p, c_char_p]
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        file_path_buf = self.str_to_char_p(file_path)
+        file_type_buf = self.str_to_char_p(file_type)
+        json_file_params_buf = self.str_to_char_p(json_file_params)
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
         load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(amlg_path)}\" {str(persist).lower()} "
-            f"{str(load_contained).lower()} {str(escape_filename).lower()} "
-            f"{str(escape_contained_filenames).lower()} \"{write_log}\" "
-            f"\"{print_log}\""
+            f"\"{self.escape_double_quotes(file_path)}\" "
+            f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
+            f"\"{self.escape_double_quotes(json_file_params)}\" "
+            f"\"{write_log}\" \"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
         result = LoadEntityStatus(self, self.amlg.LoadEntity(
-            handle_buf, amlg_path_buf, persist, load_contained,
-            escape_filename, escape_contained_filenames,
-            write_log_buf, print_log_buf))
+            handle_buf, file_path_buf, file_type_buf, persist,
+            json_file_params_buf, write_log_buf, print_log_buf))
         self._log_reply(result)
 
         del handle_buf
-        del amlg_path_buf
+        del file_path_buf
+        del file_type_buf
+        del json_file_params_buf
         del write_log_buf
         del print_log_buf
         self.gc()
@@ -803,8 +804,10 @@ class Amalgam:
         handle: str,
         clone_handle: str,
         *,
-        amlg_path: str = "",
+        file_path: str = "",
+        file_type: str = "",
         persist: bool = False,
+        json_file_params: str = "",
         write_log: str = "",
         print_log: str = ""
     ) -> bool:
@@ -817,11 +820,17 @@ class Amalgam:
             The handle of the amalgam entity to clone.
         clone_handle : str
             The handle to clone the entity into.
-        amlg_path : str, default ""
-            The path to store the filename.amlg/caml file.  Only relevant if persist is True.
+        file_path : str, default ""
+            The path of the file name to load.
+        file_type : str, default ""
+            If set to a nonempty string, will represent the type of file to load.
         persist : bool, default False
-            If set to true, all transactions will trigger the entity to be
-            saved over the original source.
+            If set to true, all transactions that update the entity will also be
+            written to the files.
+        json_file_params : str, default ""
+            Either empty string or a string of json specifying a set of key-value pairs
+            which are parameters specific to the file type.  See Amalgam documentation
+            for details of allowed parameters.
         write_log : str, default ""
             Path to the write log. If empty string, the write log is
             not generated.
@@ -835,28 +844,34 @@ class Amalgam:
             True if cloned successfully, False if not.
         """
         self.amlg.CloneEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p]
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         clone_handle_buf = self.str_to_char_p(clone_handle)
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        file_path_buf = self.str_to_char_p(file_path)
+        file_type_buf = self.str_to_char_p(file_type)
+        json_file_params_buf = self.str_to_char_p(json_file_params)
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
         clone_command_log_entry = (
             f'CLONE_ENTITY "{self.escape_double_quotes(handle)}" '
             f'"{self.escape_double_quotes(clone_handle)}" '
-            f'"{self.escape_double_quotes(amlg_path)}" {str(persist).lower()} '
-            f'"{write_log}" "{print_log}"'
+            f"\"{self.escape_double_quotes(file_path)}\" "
+            f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
+            f"\"{self.escape_double_quotes(json_file_params)}\" "
+            f"\"{write_log}\" \"{print_log}\""
         )
         self._log_execution(clone_command_log_entry)
         result = self.amlg.CloneEntity(
-            handle_buf, clone_handle_buf, amlg_path_buf, persist,
-            write_log_buf, print_log_buf)
+            handle_buf, clone_handle_buf, file_path_buf, file_type_buf, persist,
+            json_file_params_buf, write_log_buf, print_log_buf)
         self._log_reply(result)
 
         del handle_buf
         del clone_handle_buf
-        del amlg_path_buf
+        del file_path_buf
+        del file_type_buf
+        del json_file_params_buf
         del write_log_buf
         del print_log_buf
         self.gc()
@@ -866,10 +881,11 @@ class Amalgam:
     def store_entity(
         self,
         handle: str,
-        amlg_path: str,
+        file_path: str,
         *,
-        update_persistence_location: bool = False,
-        store_contained: bool = False
+        file_type: str = "",
+        persist: bool = False,
+        json_file_params: str = "",
     ):
         """
         Store entity to the file type specified within amlg_path.
@@ -878,31 +894,40 @@ class Amalgam:
         ----------
         handle : str
             The handle of the amalgam entity.
-        amlg_path : str
-            The path to the filename.amlg/caml file.
-        update_persistence_location : bool
-            If set to true, updates location entity is persisted to.
-        store_contained : bool
-            If set to true, contained entities will be stored.
+        file_path : str
+            The path of the file name to load.
+        file_type : str, default ""
+            If set to a nonempty string, will represent the type of file to load.
+        persist : bool, default False
+            If set to true, all transactions that update the entity will also be
+            written to the files.
+        json_file_params : str, default ""
+            Either empty string or a string of json specifying a set of key-value pairs
+            which are parameters specific to the file type.  See Amalgam documentation
+            for details of allowed parameters.
         """
         self.amlg.StoreEntity.argtypes = [
-            c_char_p, c_char_p, c_bool, c_bool]
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p]
         handle_buf = self.str_to_char_p(handle)
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        file_path_buf = self.str_to_char_p(file_path)
+        file_type_buf = self.str_to_char_p(file_type)
+        json_file_params_buf = self.str_to_char_p(json_file_params)
 
         store_command_log_entry = (
             f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(amlg_path)}\" "
-            f"{str(update_persistence_location).lower()} "
-            f"{str(store_contained).lower()}"
+            f"\"{self.escape_double_quotes(file_path)}\" "
+            f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
+            f"\"{self.escape_double_quotes(json_file_params)}\" "
         )
         self._log_execution(store_command_log_entry)
         self.amlg.StoreEntity(
-            handle_buf, amlg_path_buf, update_persistence_location, store_contained)
+            handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf)
         self._log_reply(None)
 
         del handle_buf
-        del amlg_path_buf
+        del file_path_buf
+        del file_type_buf
+        del json_file_params_buf
         self.gc()
 
     def destroy_entity(
