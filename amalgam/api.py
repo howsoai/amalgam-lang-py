@@ -771,14 +771,14 @@ class Amalgam:
 
     def verify_entity(
         self,
-        amlg_path: str
+        file_path: str
     ) -> LoadEntityStatus:
         """
         Verify an entity from an amalgam source file.
 
         Parameters
         ----------
-        amlg_path : str
+        file_path : str
             The path to the filename.amlg/caml file.
 
         Returns
@@ -788,13 +788,13 @@ class Amalgam:
         """
         self.amlg.VerifyEntity.argtypes = [c_char_p]
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
-        amlg_path_buf = self.str_to_char_p(amlg_path)
+        file_path_buf = self.str_to_char_p(file_path)
 
-        self._log_execution(f"VERIFY_ENTITY \"{self.escape_double_quotes(amlg_path)}\"")
-        result = LoadEntityStatus(self, self.amlg.VerifyEntity(amlg_path_buf))
+        self._log_execution(f"VERIFY_ENTITY \"{self.escape_double_quotes(file_path)}\"")
+        result = LoadEntityStatus(self, self.amlg.VerifyEntity(file_path_buf))
         self._log_reply(result)
 
-        del amlg_path_buf
+        del file_path_buf
         self.gc()
 
         return result
@@ -888,7 +888,7 @@ class Amalgam:
         json_file_params: str = "",
     ):
         """
-        Store entity to the file type specified within amlg_path.
+        Store entity to the file type specified within file_path.
 
         Parameters
         ----------
