@@ -6,6 +6,7 @@ from ctypes import (
 )
 from datetime import datetime
 import gc
+import json as json_lib
 import logging
 from pathlib import Path
 import platform
@@ -750,7 +751,7 @@ class Amalgam:
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(file_path)}\" "
             f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
-            f"\"{self.escape_double_quotes(json_file_params)}\" "
+            f"{json_lib.dumps(json_file_params)} "
             f"\"{write_log}\" \"{print_log}\""
         )
         self._log_execution(load_command_log_entry)
@@ -844,7 +845,7 @@ class Amalgam:
             True if cloned successfully, False if not.
         """
         self.amlg.CloneEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
+            c_char_p, c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         clone_handle_buf = self.str_to_char_p(clone_handle)
         file_path_buf = self.str_to_char_p(file_path)
@@ -858,7 +859,7 @@ class Amalgam:
             f'"{self.escape_double_quotes(clone_handle)}" '
             f"\"{self.escape_double_quotes(file_path)}\" "
             f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
-            f"\"{self.escape_double_quotes(json_file_params)}\" "
+            f"{json_lib.dumps(json_file_params)} "
             f"\"{write_log}\" \"{print_log}\""
         )
         self._log_execution(clone_command_log_entry)
@@ -917,7 +918,7 @@ class Amalgam:
             f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(file_path)}\" "
             f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
-            f"\"{self.escape_double_quotes(json_file_params)}\" "
+            f"{json_lib.dumps(json_file_params)} "
         )
         self._log_execution(store_command_log_entry)
         self.amlg.StoreEntity(
