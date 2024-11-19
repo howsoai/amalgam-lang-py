@@ -223,7 +223,7 @@ jobs:
 
   pytest-linux-3-9-st:
     needs: ['metadata', 'build']
-    uses: howsoai/.github/.github/workflows/pytest.yml@22210
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
       platform: 'ubuntu-latest'
@@ -238,7 +238,7 @@ jobs:
 
   pytest-linux-3-12-mt:
     needs: ['metadata', 'build']
-    uses: howsoai/.github/.github/workflows/pytest.yml@22210
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
       platform: 'ubuntu-latest'
