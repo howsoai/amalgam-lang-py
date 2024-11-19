@@ -77,7 +77,12 @@ jobs:
       run: |
         run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
         run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
-        gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64" "$run_id"
+        # Release artifacts will have a .tar.gz postfix while branch/PR build artifacts will not
+        if [[ "$run_type" == "release" ]]; then
+          gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64.tar.gz" "$run_id"
+        else
+          gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64" "$run_id"
+        fi
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
@@ -90,7 +95,11 @@ jobs:
       run: |
         run_id=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_id')
         run_type=$(printf "%s" '${{ needs.metadata.outputs.upstream-details }}' | jq -r '."amalgam".run_type')
-        gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64-228" "$run_id"
+        if [[ "$run_type" == "release" ]]; then
+          gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64-228.tar.gz" "$run_id"
+        else
+          gh $run_type download -D amalgam/lib/linux/amd64 -R "howsoai/amalgam" -p "amalgam-*-linux-amd64-228" "$run_id"
+        fi
         # Needed because release/non-release downloads are different structure
         cd amalgam/lib/linux/amd64 && if [ ! -f *.tar.gz ]; then mv */*.tar.gz ./; fi && tar -xvzf *.tar.gz
 
