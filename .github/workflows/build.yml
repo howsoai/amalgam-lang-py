@@ -323,6 +323,7 @@ jobs:
     - name: Publish [PyPi]
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
+        verbose: True
         # Experimental feature not yet compatible with our workflow
         attestations: False
 
