@@ -313,7 +313,7 @@ jobs:
         mkdir -p dist
         find ./tmp -type f -name '*.whl' -exec cp -t ./dist {} +
         find ./tmp -type f -name '*.tar.gz' -exec cp -t ./dist {} +
-        ls ./dist
+        ls -l ./dist
 
     - name: Set up Python
       uses: actions/setup-python@v5
