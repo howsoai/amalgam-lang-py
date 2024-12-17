@@ -1058,6 +1058,49 @@ class Amalgam:
 
         return result
 
+    def eval_on_entity(
+        self,
+        handle: str,
+        amlg: str
+    ) -> bytes:
+        """
+        Execute arbitrary Amalgam code against an entity.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        amlg : str
+            The code to execute.
+
+        Returns
+        -------
+        bytes
+            A byte-encoded json representation of the response.
+
+        """
+        self.amlg.EvalOnEntity.restype = POINTER(c_char)
+        self.amlg.EvalOnEntity.argtypes = [
+            c_char_p, c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+        amlg_buf = self.str_to_char_p(amlg)
+
+        self._log_time("EXECUTION START")
+        self._log_execution((
+            "EVAL_ON_ENTITY "
+            f"\"{self.escape_double_quotes(handle)}\" "
+            f"\"{self.escape_double_quotes(amlg)}\""
+        ))
+        result = self.char_p_to_bytes(self.amlg.EvalOnEntity(
+            handle_buf, amlg_buf))
+        self._log_time("EXECUTION STOP")
+        self._log_reply(result)
+
+        del handle_buf
+        del amlg_buf
+
+        return result
+
     def get_version_string(self) -> bytes:
         """
         Get the version string of the amalgam dynamic library.
