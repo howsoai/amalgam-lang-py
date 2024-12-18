@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ctypes import (
-    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_double, c_size_t, c_uint64, c_void_p,
+    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
     cast, cdll, POINTER, Structure
 )
 from datetime import datetime
@@ -55,8 +55,8 @@ class LoadEntityStatus:
             self.version = ""
         else:
             self.loaded = bool(c_status.loaded)
-            self.message = api.char_p_to_bytes(c_status.message).decode("utf-8")
-            self.version = api.char_p_to_bytes(c_status.version).decode("utf-8")
+            self.message = api.char_p_to_str(c_status.message)
+            self.version = api.char_p_to_str(c_status.version)
 
     def __str__(self) -> str:
         """
@@ -68,6 +68,57 @@ class LoadEntityStatus:
             The human-readable string representation.
         """
         return f"{self.loaded},\"{self.message}\",\"{self.version}\""
+
+
+class _ResultWithLog(Structure):
+    """The C-native version of :class:`ResultWithLog`."""
+    _fields_ = [
+        ("json", POINTER(c_char)),
+        ("log", POINTER(c_char))
+    ]
+
+
+class ResultWithLog:
+    """
+    Return value from :func:`~api.Amalgam.execute_entity_json_logged`.
+
+    Parameters
+    ----------
+    json : str | None
+        The JSON-format response from the Amalgam invocation.
+    log : str | None
+        The Amalgam-syntax transaction-log entry.
+    """
+
+    def __init__(self, *, json: str | None, log: str | None):
+        self.json = json
+        """The JSON-format response from the Amalgam invocation."""
+
+        self.log = log
+        """The Amalgam-syntax transaction-log entry."""
+
+    @classmethod
+    def from_c_result(cls, api: Amalgam, c_result: _ResultWithLog) -> t.Self:
+        """
+        Construct a `ResultWithLog` from the raw C result.
+
+        Frees the strings in the C result.
+
+        Parameters
+        ----------
+        api : Amalgam
+            The Amalgam API layer.
+        c_result: _ResultWithLog
+            The raw C result structure.
+
+        Returns
+        -------
+        ResultWithLog
+            A populated Python-side structure.
+        """
+        json = api.char_p_to_str(c_result.json)
+        log = api.char_p_to_str(c_result.log)
+        return cls(json=json, log=log)
 
 
 class Amalgam:
@@ -625,6 +676,29 @@ class Amalgam:
 
         return bytes_str
 
+    def char_p_to_str(self, p: _Pointer[c_char] | c_char_p) -> str | None:
+        """
+        Copy native C char pointer to UTF-8-encoded string, cleaning up memory correctly.
+
+        Parameters
+        ----------
+        p : c_char_p
+            The char pointer to convert
+
+        Returns
+        -------
+        str or None
+            The resulting string
+        """
+        b = self.char_p_to_bytes(p)
+        s: str | None = None
+        if b is not None:
+            try:
+                s = b.decode("UTF-8")
+            except UnicodeDecodeError:
+                s = None
+        return s
+
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
         Get a label from amalgam and returns it in json format.
@@ -1048,6 +1122,56 @@ class Amalgam:
             f"{json}"
         ))
         result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+            handle_buf, label_buf, json_buf))
+        self._log_time("EXECUTION STOP")
+        self._log_reply(result)
+
+        del handle_buf
+        del label_buf
+        del json_buf
+
+        return result
+
+    def execute_entity_json_logged(
+            self,
+            handle: str,
+            label: str,
+            json: str | bytes
+    ) -> ResultWithLog:
+        """
+        Execute a label, and also return a transaction log.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+
+        label : str
+            The label to execute.
+        json : str or bytes
+            A json representation of parameters for the label to be executed.
+
+        Returns
+        -------
+        ResultWithLog
+            Both a JSON-encoded response and the Amalgam-format transaction log entry.
+
+        """
+        self.amlg.ExecuteEntityJsonPtrLogged.restype = _ResultWithLog
+        self.amlg.ExecuteEntityJsonPtrLogged.argtypes = [
+            c_char_p, c_char_p, c_char_p]
+        handle_buf = self.str_to_char_p(handle)
+        label_buf = self.str_to_char_p(label)
+        json_buf = self.str_to_char_p(json)
+
+        self._log_time("EXECUTION START")
+        self._log_execution((
+            "EXECUTE_ENTITY_JSON_LOGGED "
+            f"\"{self.escape_double_quotes(handle)}\" "
+            f"\"{self.escape_double_quotes(label)}\" "
+            f"{json}"
+        ))
+        result = ResultWithLog.from_c_result(self, self.amlg.ExecuteEntityJsonPtrLogged(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
