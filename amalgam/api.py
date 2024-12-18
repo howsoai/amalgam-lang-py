@@ -1133,10 +1133,10 @@ class Amalgam:
         return result
 
     def execute_entity_json_logged(
-            self,
-            handle: str,
-            label: str,
-            json: str | bytes
+        self,
+        handle: str,
+        label: str,
+        json: str | bytes
     ) -> ResultWithLog:
         """
         Execute a label, and also return a transaction log.
