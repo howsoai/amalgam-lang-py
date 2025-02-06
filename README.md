@@ -13,7 +13,7 @@ Coding in [Amalgam](https://github.com/howsoai/amalgam) can be done natively as 
 
 ## Supported Platforms
 
-Compatible with Python versions: 3.9, 3.10, 3.11, and 3.12.
+Compatible with Python versions: 3.9, 3.10, 3.11, 3.12, and 3.13.
 
 #### Operating Systems
 
