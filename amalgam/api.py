@@ -84,13 +84,13 @@ class ResultWithLog:
 
     Parameters
     ----------
-    json : str | None
+    json : bytes | None
         The JSON-format response from the Amalgam invocation.
-    log : str | None
+    log : bytes | None
         The Amalgam-syntax transaction-log entry.
     """
 
-    def __init__(self, *, json: str | None, log: str | None):
+    def __init__(self, *, json: bytes | None, log: bytes | None):
         self.json = json
         """The JSON-format response from the Amalgam invocation."""
 
@@ -116,8 +116,8 @@ class ResultWithLog:
         ResultWithLog
             A populated Python-side structure.
         """
-        json = api.char_p_to_str(c_result.json)
-        log = api.char_p_to_str(c_result.log)
+        json = api.char_p_to_bytes(c_result.json)
+        log = api.char_p_to_bytes(c_result.log)
         return cls(json=json, log=log)
 
 
