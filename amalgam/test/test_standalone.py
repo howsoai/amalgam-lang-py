@@ -63,6 +63,10 @@ def bulk_operations(amlg):
         handle = str(uuid4())
         amlg.load_entity(handle, os.path.dirname(
             amalgam.__file__) + "/test/test.amlg", write_log="", print_log="")
+        
+        amlg.set_entity_permissions(handle, json.dumps(True))
+        amlg.get_entity_permissions(handle)
+
         _logger.debug(n)
         start = dt.datetime.now()
         i = 0

@@ -874,6 +874,77 @@ class Amalgam:
 
         return result
 
+    def get_entity_permissions(
+        self,
+        handle: str
+    ) -> str:
+        """
+        Get the entity permissions as a JSON object.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the entity.
+
+        Returns
+        -------
+        str
+            A JSON object representing the entity permissions.
+        """
+        self.amlg.GetEntityPermissions.argtypes = [c_char_p]
+        self.amlg.GetEntityPermissions.restype = c_char_p
+        handle_buf = self.str_to_char_p(handle)
+
+        self._log_execution(f"GET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\"")
+        result = self.amlg.GetEntityPermissions(handle_buf)
+        self._log_reply(result)
+
+        del handle_buf
+        self.gc()
+
+        return result
+
+
+    def set_entity_permissions(
+        self,
+        handle: str,
+        json_permissions: str
+    ) -> bool:
+        """
+        Set the entity permissions to the object in json_permissions.
+        See Amalgam language documentation for details of valid permissions.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the entity.
+        json_permissions : str
+            A JSON object representing the entity permissions.
+        
+        Returns
+        -------
+        bool
+            True if the set was successful, false if not.
+        """
+        self.amlg.SetEntityPermissions.argtypes = [c_char_p, c_char_p]
+        self.amlg.SetEntityPermissions.restype = c_bool
+        handle_buf = self.str_to_char_p(handle)
+        json_permissions_buf = self.str_to_char_p(json_permissions)
+
+        set_permissions_log_entry = (
+            f"SET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\" "
+            f"{json_lib.dumps(json_permissions)}"
+        )
+        self._log_execution(set_permissions_log_entry)
+        result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
+        self._log_reply("Success")
+
+        del handle_buf
+        del json_permissions_buf
+        self.gc()
+
+        return result
+
     def clone_entity(
         self,
         handle: str,
