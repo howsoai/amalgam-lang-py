@@ -63,6 +63,21 @@ def bulk_operations(amlg):
         handle = str(uuid4())
         amlg.load_entity(handle, os.path.dirname(
             amalgam.__file__) + "/test/test.amlg", write_log="", print_log="")
+
+        amlg.set_entity_permissions(handle, json.dumps(True))
+        ent_permissions = json.loads(amlg.get_entity_permissions(handle))
+        for permission_str in [
+            "std_out_and_std_err",
+            "std_in",
+            "load",
+            "store",
+            "environment",
+            "alter_performance",
+            "system"
+        ]:
+            assert permission_str in ent_permissions
+            assert ent_permissions[permission_str] is True
+
         _logger.debug(n)
         start = dt.datetime.now()
         i = 0

@@ -874,6 +874,77 @@ class Amalgam:
 
         return result
 
+    def get_entity_permissions(
+        self,
+        handle: str
+    ) -> bytes:
+        """
+        Get the entity permissions as a JSON object.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the entity.
+
+        Returns
+        -------
+        str
+            A JSON object representing the entity permissions.
+        """
+        self.amlg.GetEntityPermissions.argtypes = [c_char_p]
+        self.amlg.GetEntityPermissions.restype = POINTER(c_char)
+        handle_buf = self.str_to_char_p(handle)
+
+        self._log_execution(f"GET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\"")
+        result = self.char_p_to_bytes(self.amlg.GetEntityPermissions(handle_buf))
+        self._log_reply(result)
+
+        del handle_buf
+        self.gc()
+
+        return result
+
+
+    def set_entity_permissions(
+        self,
+        handle: str,
+        json_permissions: str | bytes
+    ) -> bool:
+        """
+        Set the entity permissions to the object in json_permissions.
+        See Amalgam language documentation for details of valid permissions.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the entity.
+        json_permissions : str or bytes
+            A JSON object representing the entity permissions.
+
+        Returns
+        -------
+        bool
+            True if the set was successful, false if not.
+        """
+        self.amlg.SetEntityPermissions.argtypes = [c_char_p, c_char_p]
+        self.amlg.SetEntityPermissions.restype = c_bool
+        handle_buf = self.str_to_char_p(handle)
+        json_permissions_buf = self.str_to_char_p(json_permissions)
+
+        set_permissions_log_entry = (
+            f"SET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\" "
+            f"{json_permissions}"
+        )
+        self._log_execution(set_permissions_log_entry)
+        result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
+        self._log_reply(result)
+
+        del handle_buf
+        del json_permissions_buf
+        self.gc()
+
+        return result
+
     def clone_entity(
         self,
         handle: str,
@@ -1053,9 +1124,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
-        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}"'
+        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}" '
                             f'"{self.escape_double_quotes(rand_seed)}"')
-        result = self.amlg.SetRandomSeed(handle_buf, rand_seed)
+        result = self.amlg.SetRandomSeed(handle_buf, rand_seed_buf)
         self._log_reply(None)
 
         del handle_buf
