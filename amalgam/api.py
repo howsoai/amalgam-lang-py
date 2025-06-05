@@ -918,7 +918,7 @@ class Amalgam:
         ----------
         handle : str
             The handle of the entity.
-        json_permissions : str
+        json_permissions : str or bytes
             A JSON object representing the entity permissions.
 
         Returns
@@ -933,7 +933,7 @@ class Amalgam:
 
         set_permissions_log_entry = (
             f"SET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\" "
-            f"{json_lib.dumps(json_permissions)}"
+            f"{json_permissions}"
         )
         self._log_execution(set_permissions_log_entry)
         result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
@@ -1124,9 +1124,9 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
-        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}"'
+        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}" '
                             f'"{self.escape_double_quotes(rand_seed)}"')
-        result = self.amlg.SetRandomSeed(handle_buf, rand_seed)
+        result = self.amlg.SetRandomSeed(handle_buf, rand_seed_buf)
         self._log_reply(None)
 
         del handle_buf
