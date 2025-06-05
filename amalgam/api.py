@@ -877,7 +877,7 @@ class Amalgam:
     def get_entity_permissions(
         self,
         handle: str
-    ) -> str:
+    ) -> bytes:
         """
         Get the entity permissions as a JSON object.
 
@@ -892,11 +892,11 @@ class Amalgam:
             A JSON object representing the entity permissions.
         """
         self.amlg.GetEntityPermissions.argtypes = [c_char_p]
-        self.amlg.GetEntityPermissions.restype = c_char_p
+        self.amlg.GetEntityPermissions.restype = POINTER(c_char)
         handle_buf = self.str_to_char_p(handle)
 
         self._log_execution(f"GET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\"")
-        result = self.amlg.GetEntityPermissions(handle_buf)
+        result = self.char_p_to_bytes(self.amlg.GetEntityPermissions(handle_buf))
         self._log_reply(result)
 
         del handle_buf
@@ -920,7 +920,7 @@ class Amalgam:
             The handle of the entity.
         json_permissions : str
             A JSON object representing the entity permissions.
-        
+
         Returns
         -------
         bool
@@ -937,7 +937,7 @@ class Amalgam:
         )
         self._log_execution(set_permissions_log_entry)
         result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
-        self._log_reply("Success")
+        self._log_reply(result)
 
         del handle_buf
         del json_permissions_buf
