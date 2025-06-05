@@ -908,7 +908,7 @@ class Amalgam:
     def set_entity_permissions(
         self,
         handle: str,
-        json_permissions: str
+        json_permissions: str | bytes
     ) -> bool:
         """
         Set the entity permissions to the object in json_permissions.
