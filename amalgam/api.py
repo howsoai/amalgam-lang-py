@@ -1256,7 +1256,7 @@ class Amalgam:
     def eval_on_entity(
         self,
         handle: str,
-        amlg: str
+        amlg: str | bytes
     ) -> bytes:
         """
         Execute arbitrary Amalgam code against an entity.
@@ -1265,7 +1265,7 @@ class Amalgam:
         ----------
         handle : str
             The handle of the amalgam entity.
-        amlg : str
+        amlg : str | bytes
             The code to execute.
 
         Returns
@@ -1284,7 +1284,7 @@ class Amalgam:
         self._log_execution((
             "EVAL_ON_ENTITY "
             f"\"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(amlg)}\""
+            f"\"{self.escape_double_quotes(str(amlg))}\""
         ))
         result = self.char_p_to_bytes(self.amlg.EvalOnEntity(
             handle_buf, amlg_buf))
