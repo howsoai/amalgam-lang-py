@@ -230,7 +230,7 @@ jobs:
     with:
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
-  pytest-linux-3-9-st:
+  pytest-linux-3-10-st:
     needs: ['metadata', 'build']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
@@ -238,7 +238,7 @@ jobs:
       platform: 'ubuntu-latest'
       platform-pretty: 'Linux'
       amalgam-plat-arch: 'linux-amd64'
-      python-version: '3.9'
+      python-version: '3.10'
       config-fp: './config/latest-st-traces-howso.yml'
       config-pretty: 'ST'
       workers: 'auto'
@@ -292,7 +292,7 @@ jobs:
     needs:
       - metadata
       - workflow-summary
-      - pytest-linux-3-9-st
+      - pytest-linux-3-10-st
       - pytest-linux-3-13-mt
       - pytest-macos-3-13-mt
       - pytest-windows-3-13-mt
@@ -340,7 +340,7 @@ jobs:
       - metadata
       - generate-changelog
       - workflow-summary
-      - pytest-linux-3-9-st
+      - pytest-linux-3-10-st
       - pytest-linux-3-13-mt
       - pytest-macos-3-13-mt
       - pytest-windows-3-13-mt
