@@ -292,7 +292,7 @@ jobs:
     needs:
       - metadata
       - workflow-summary
-      - pytest-linux-3-9-st
+      - pytest-linux-3-10-st
       - pytest-linux-3-13-mt
       - pytest-macos-3-13-mt
       - pytest-windows-3-13-mt
@@ -340,7 +340,7 @@ jobs:
       - metadata
       - generate-changelog
       - workflow-summary
-      - pytest-linux-3-9-st
+      - pytest-linux-3-10-st
       - pytest-linux-3-13-mt
       - pytest-macos-3-13-mt
       - pytest-windows-3-13-mt
