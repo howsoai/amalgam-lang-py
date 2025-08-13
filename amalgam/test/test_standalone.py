@@ -3,7 +3,6 @@ import logging
 import json
 from uuid import uuid4
 import os
-import random
 
 import pytest
 
@@ -14,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 amlg_postfix = os.getenv('AMALGAM_LIBRARY_POSTFIX', '-st')
 amlg_path, _ = Amalgam._get_library_path(library_postfix=amlg_postfix)
-_logger.debug(f'Amalgam path: ', {amlg_path})
+_logger.debug('Amalgam path: %s', amlg_path)
 is_amalgam_installed = amlg_path.exists()
 
 

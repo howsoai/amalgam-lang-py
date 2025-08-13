@@ -237,8 +237,7 @@ class Amalgam:
                     )
                     counter += 1
 
-            self.trace = open(self.execution_trace_filepath, 'w+',
-                              encoding='utf-8')
+            self.trace = self.execution_trace_filepath.open("wb+")
             _logger.debug("Opening Amalgam trace file: "
                           f"{self.execution_trace_filepath}")
         else:
@@ -253,7 +252,7 @@ class Amalgam:
             self.set_max_num_threads(max_num_threads)
         self.gc_interval = gc_interval
         self.op_count = 0
-        self.load_command_log_entry = None
+        self.load_command_log_entry: bytes | None = None
 
     @classmethod
     def _get_allowed_postfixes(cls, library_dir: Path) -> list[str]:
@@ -470,7 +469,7 @@ class Amalgam:
             The maximum number of threads that Amalgam is configured to use.
         """
         self.amlg.GetMaxNumThreads.restype = c_size_t
-        self._log_execution("GET_MAX_NUM_THREADS")
+        self._log_execution(b"GET_MAX_NUM_THREADS")
         result = self.amlg.GetMaxNumThreads()
         self._log_reply(result)
 
@@ -492,7 +491,7 @@ class Amalgam:
         self.amlg.SetMaxNumThreads.argtypes = [c_size_t]
         self.amlg.SetMaxNumThreads.restype = c_void_p
 
-        self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}")
+        self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}".encode())
         result = self.amlg.SetMaxNumThreads(max_num_threads)
         self._log_reply(result)
 
@@ -511,7 +510,7 @@ class Amalgam:
         _logger.debug(f"Execution trace file being reset: "
                       f"{self.execution_trace_filepath} to be closed ...")
         # Write exit command.
-        self.trace.write("EXIT\n")
+        self.trace.write(b"EXIT\n")
         self.trace.close()
         self.execution_trace_filepath = Path(self.execution_trace_dir, file)
 
@@ -523,12 +522,12 @@ class Amalgam:
                     self.execution_trace_dir, f'{file}.{counter}')
                 counter += 1
 
-        self.trace = open(self.execution_trace_filepath, 'w+')
+        self.trace = self.execution_trace_filepath.open("wb+")
         _logger.debug(f"New trace file: {self.execution_trace_filepath} "
                       f"opened.")
         # Write load command used to instantiate the amalgam instance.
         if self.load_command_log_entry is not None:
-            self.trace.write(self.load_command_log_entry + "\n")
+            self.trace.write(self.load_command_log_entry + b"\n")
         self.trace.flush()
 
     def __str__(self) -> str:
@@ -543,7 +542,7 @@ class Amalgam:
             getattr(self, 'trace', None) is not None
         ):
             try:
-                self.trace.write("EXIT\n")
+                self.trace.write(b"EXIT\n")
             except Exception:  # noqa - deliberately broad
                 pass
 
@@ -559,7 +558,7 @@ class Amalgam:
             The raw reply string to log.
         """
         if self.trace:
-            self.trace.write("# NOTE >" + str(comment) + "\n")
+            self.trace.write(b"# NOTE >" + comment.encode() + b"\n")
             self.trace.flush()
 
     def _log_reply(self, reply: t.Any):
@@ -574,7 +573,13 @@ class Amalgam:
             The raw reply string to log.
         """
         if self.trace:
-            self.trace.write("# RESULT >" + str(reply) + "\n")
+            if isinstance(reply, ResultWithLog):
+                if reply.json:
+                    self.trace.write(b"# RESULT >" + reply.json + b"\n")
+                if reply.log:
+                    self.trace.write(b"# LOG >" + reply.log + b"\n")
+            else:
+                self.trace.write(b"# RESULT >" + str(reply).encode() + b"\n")
             self.trace.flush()
 
     def _log_time(self, label: str):
@@ -588,11 +593,11 @@ class Amalgam:
         """
         if self.trace:
             dt = datetime.now()
-            self.trace.write(f"# TIME {label} {dt:%Y-%m-%d %H:%M:%S},"
-                             f"{f'{dt:%f}'[:3]}\n")
+            time_str = f"{label} {dt:%Y-%m-%d %H:%M:%S},{f'{dt:%f}'[:3]}"
+            self.trace.write(b"# TIME " + time_str.encode() + b"\n")
             self.trace.flush()
 
-    def _log_execution(self, execution_string: str):
+    def _log_execution(self, execution_string: bytes):
         """
         Log an execution string.
 
@@ -601,7 +606,7 @@ class Amalgam:
 
         Parameters
         ----------
-        execution_string : str
+        execution_string : bytes
             A formatted string that can be piped into an amalgam command line
             process for use in debugging.
 
@@ -610,8 +615,34 @@ class Amalgam:
                 string passed is valid.
         """
         if self.trace:
-            self.trace.write(execution_string + "\n")
+            self.trace.write(execution_string + b"\n")
             self.trace.flush()
+    
+    def _log_execution_std(self, command: bytes, *args: str, suffix: str | bytes | None = None) -> None:
+        """
+        Log an execution string in a canonical form.
+
+        This looks like ``COMMAND "arg" "arg" suffix``.
+
+        Parameters
+        ----------
+        command : bytes
+            The trace file command string.
+        args : str
+            Arbitrary parameters to the command, will have double quotes escaped.
+        suffix : bytes, optional
+            Arbitrary binary data to append to the command string unprocessed.
+        """
+        if not self.trace:
+            return
+        words = [b"\"" + self.escape_double_quotes(arg).encode() + b"\"" for arg in args]
+        words.insert(0, command)
+        if isinstance(suffix, str):
+            words.append(suffix.encode())
+        elif isinstance(suffix, bytes):
+            words.append(suffix)
+        self.trace.write(b" ".join(words) + b"\n")
+        self.trace.flush()
 
     def gc(self):
         """Force garbage collection when called if self.force_gc is set."""
@@ -720,10 +751,7 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
 
-        self._log_execution((
-            f"GET_JSON_FROM_LABEL \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\""
-        ))
+        self._log_execution_std(b"GET_JSON_FROM_LABEL", handle, label)
         result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
         self._log_reply(result)
 
@@ -757,11 +785,7 @@ class Amalgam:
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
 
-        self._log_execution((
-            f"SET_JSON_TO_LABEL \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\" "
-            f"{json}"
-        ))
+        self._log_execution_std(b"SET_JSON_TO_LABEL", handle, label, suffix=json)
         self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
         self._log_reply(None)
 
@@ -821,14 +845,14 @@ class Amalgam:
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        load_command_log_entry = (
+        self.load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(file_path)}\" "
             f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
             f"{json_lib.dumps(json_file_params)} "
             f"\"{write_log}\" \"{print_log}\""
-        )
-        self._log_execution(load_command_log_entry)
+        ).encode()
+        self._log_execution(self.load_command_log_entry)
         result = LoadEntityStatus(self, self.amlg.LoadEntity(
             handle_buf, file_path_buf, file_type_buf, persist,
             json_file_params_buf, write_log_buf, print_log_buf))
@@ -865,7 +889,7 @@ class Amalgam:
         self.amlg.VerifyEntity.restype = _LoadEntityStatus
         file_path_buf = self.str_to_char_p(file_path)
 
-        self._log_execution(f"VERIFY_ENTITY \"{self.escape_double_quotes(file_path)}\"")
+        self._log_execution_std(b"VERIFY_ENTITY", file_path)
         result = LoadEntityStatus(self, self.amlg.VerifyEntity(file_path_buf))
         self._log_reply(result)
 
@@ -895,7 +919,7 @@ class Amalgam:
         self.amlg.GetEntityPermissions.restype = POINTER(c_char)
         handle_buf = self.str_to_char_p(handle)
 
-        self._log_execution(f"GET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\"")
+        self._log_execution_std(b"GET_ENTITY_PERMISSIONS", handle)
         result = self.char_p_to_bytes(self.amlg.GetEntityPermissions(handle_buf))
         self._log_reply(result)
 
@@ -931,11 +955,7 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         json_permissions_buf = self.str_to_char_p(json_permissions)
 
-        set_permissions_log_entry = (
-            f"SET_ENTITY_PERMISSIONS \"{self.escape_double_quotes(handle)}\" "
-            f"{json_permissions}"
-        )
-        self._log_execution(set_permissions_log_entry)
+        self._log_execution_std(b"SET_ENTITY_PERMISSIONS", handle, suffix=json_permissions)
         result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
         self._log_reply(result)
 
@@ -999,15 +1019,13 @@ class Amalgam:
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        clone_command_log_entry = (
-            f'CLONE_ENTITY "{self.escape_double_quotes(handle)}" '
-            f'"{self.escape_double_quotes(clone_handle)}" '
-            f"\"{self.escape_double_quotes(file_path)}\" "
-            f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
-            f"{json_lib.dumps(json_file_params)} "
-            f"\"{write_log}\" \"{print_log}\""
+        self._log_execution_std(b"CLONE_ENTITY", handle, clone_handle, file_path, file_type,
+                                suffix=(
+                                    f"{str(persist).lower()} "
+                                    f"{json_lib.dumps(json_file_params)} "
+                                    f"\"{write_log}\" \"{print_log}\""
+                                )
         )
-        self._log_execution(clone_command_log_entry)
         result = self.amlg.CloneEntity(
             handle_buf, clone_handle_buf, file_path_buf, file_type_buf, persist,
             json_file_params_buf, write_log_buf, print_log_buf)
@@ -1059,13 +1077,8 @@ class Amalgam:
         file_type_buf = self.str_to_char_p(file_type)
         json_file_params_buf = self.str_to_char_p(json_file_params)
 
-        store_command_log_entry = (
-            f"STORE_ENTITY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(file_path)}\" "
-            f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
-            f"{json_lib.dumps(json_file_params)} "
-        )
-        self._log_execution(store_command_log_entry)
+        self._log_execution_std(b"STORE_ENTITY", handle, file_path, file_type,
+                                suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)}")
         self.amlg.StoreEntity(
             handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf)
         self._log_reply(None)
@@ -1091,7 +1104,7 @@ class Amalgam:
         self.amlg.DestroyEntity.argtypes = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
 
-        self._log_execution(f"DESTROY_ENTITY \"{self.escape_double_quotes(handle)}\"")
+        self._log_execution_std(b"DESTROY_ENTITY", handle)
         self.amlg.DestroyEntity(handle_buf)
         self._log_reply(None)
 
@@ -1124,8 +1137,7 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
-        self._log_execution(f'SET_RANDOM_SEED "{self.escape_double_quotes(handle)}" '
-                            f'"{self.escape_double_quotes(rand_seed)}"')
+        self._log_execution_std(b"SET_RANDOM_SEED", handle, rand_seed)
         result = self.amlg.SetRandomSeed(handle_buf, rand_seed_buf)
         self._log_reply(None)
 
@@ -1186,12 +1198,7 @@ class Amalgam:
         json_buf = self.str_to_char_p(json)
 
         self._log_time("EXECUTION START")
-        self._log_execution((
-            "EXECUTE_ENTITY_JSON "
-            f"\"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\" "
-            f"{json}"
-        ))
+        self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
         result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
@@ -1236,12 +1243,7 @@ class Amalgam:
         json_buf = self.str_to_char_p(json)
 
         self._log_time("EXECUTION START")
-        self._log_execution((
-            "EXECUTE_ENTITY_JSON_LOGGED "
-            f"\"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(label)}\" "
-            f"{json}"
-        ))
+        self._log_execution_std(b"EXECUTE_ENTITY_JSON_LOGGED", handle, label, suffix=json)
         result = ResultWithLog.from_c_result(self, self.amlg.ExecuteEntityJsonPtrLogged(
             handle_buf, label_buf, json_buf))
         self._log_time("EXECUTION STOP")
@@ -1281,11 +1283,7 @@ class Amalgam:
         amlg_buf = self.str_to_char_p(amlg)
 
         self._log_time("EXECUTION START")
-        self._log_execution((
-            "EVAL_ON_ENTITY "
-            f"\"{self.escape_double_quotes(handle)}\" "
-            f"\"{self.escape_double_quotes(str(amlg))}\""
-        ))
+        self._log_execution_std(b"EVAL_ON_ENTITY", handle, str(amlg))
         result = self.char_p_to_bytes(self.amlg.EvalOnEntity(
             handle_buf, amlg_buf))
         self._log_time("EXECUTION STOP")
