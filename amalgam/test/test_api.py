@@ -1,9 +1,10 @@
+from io import BytesIO
 from pathlib import Path, WindowsPath
 from platform import system
 import warnings
 
 from amalgam import api
-from amalgam.api import Amalgam
+from amalgam.api import Amalgam, _ResultWithLog
 import pytest
 
 
@@ -144,3 +145,39 @@ def test_get_library_path_postfix_warns(mocker, amalgam_factory, path_in,
                                    library_postfix=postfix_in)
 
     assert amlg.library_postfix == postfix
+
+
+def test_logging_basic(amalgam_factory):
+    amlg = amalgam_factory()
+    amlg.trace = BytesIO()
+    amlg._log_execution_std(b"FOO", "bar", """{"baz": "quux"}""")
+    assert amlg.trace.getvalue() == b"""FOO "bar" "{\\"baz\\": \\"quux\\"}"\n"""
+
+
+def test_logging_suffix(amalgam_factory):
+    amlg = amalgam_factory()
+    amlg.trace = BytesIO()
+    amlg._log_execution_std(b"FOO", "bar", suffix="""{"baz": "quux"}""")
+    assert amlg.trace.getvalue() == b"""FOO "bar" {"baz": "quux"}\n"""
+
+
+def test_logging_logged(mocker, amalgam_factory):
+    amlg = amalgam_factory()
+    json = amlg.str_to_char_p("{}")
+    log = amlg.str_to_char_p("(seq)")
+    try:
+        mocker.patch.object(amlg.amlg, "ExecuteEntityJsonPtrLogged", return_value=_ResultWithLog(json, log))
+        amlg.trace = BytesIO()
+        amlg.execute_entity_json_logged("00000000-0000-0000-0000-000000000000", "any_label", b"""{"foo": "bar"}""")
+        the_trace = amlg.trace.getvalue()
+        trace_lines = the_trace.split(b"\n")
+        assert trace_lines[0].startswith(b"# TIME EXECUTION START")
+        assert trace_lines[1] == b"""EXECUTE_ENTITY_JSON_LOGGED "00000000-0000-0000-0000-000000000000" "any_label" {"foo": "bar"}"""
+        assert trace_lines[2].startswith(b"# TIME EXECUTION STOP")
+        assert trace_lines[3] == b"# RESULT >{}"
+        assert trace_lines[4] == b"# LOG >(seq)"
+        assert trace_lines[5] == b""
+        assert len(trace_lines) == 6
+    finally:
+        del log
+        del json
