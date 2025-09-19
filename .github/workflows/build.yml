@@ -327,12 +327,30 @@ jobs:
         # Experimental feature not yet compatible with our workflow
         attestations: False
 
+  get-amalgam-version:
+    if: inputs.build-type == 'release'
+    runs-on: ubuntu-latest
+    outputs:
+      amlg-ver: ${{ steps.read-version-json.outputs.AMLG_VER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Amalgam version
+        id: read-version-json
+        run: |
+          amlg_version=$(jq -r '.version.amalgam' version.json)
+          echo "Releasing with Amalgam $amlg_version"
+          echo "amlg-ver=$amlg_version" >> $GITHUB_OUTPUT
+
   generate-changelog:
     if: inputs.build-type == 'release'
     secrets: inherit
     needs:
       - metadata
+      - get-amalgam-version
     uses: "howsoai/.github/.github/workflows/release-notes.yml@main"
+    with:
+      amalgam-version: ${{ needs.get-amalgam-version.outputs.amlg-ver }}
 
   release:
     if: inputs.build-type == 'release'
