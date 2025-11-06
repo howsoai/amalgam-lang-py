@@ -628,7 +628,7 @@ class Amalgam:
         if self.trace:
             self.trace.write(execution_string + b"\n")
             self.trace.flush()
-    
+
     def _log_execution_std(self, command: bytes, *args: str, suffix: str | bytes | None = None) -> None:
         """
         Log an execution string in a canonical form.
@@ -1271,7 +1271,8 @@ class Amalgam:
             for i, entry in enumerate(entity_path):
                 entity_path_p[i] = self.str_to_char_p(entry)
 
-        self._log_execution(f"STORE_ENTITY_TO_MEMORY \"{self.escape_double_quotes(handle)}\" false {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"".encode())
+        self._log_execution_std(b"STORE_ENTITY_TO_MEMORY", handle, file_type,
+                                suffix=f"false {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
         self.amlg.StoreEntityToMemory(
             handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf, entity_path_p, entity_path_len)
 
