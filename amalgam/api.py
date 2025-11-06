@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from base64 import b64encode
 from ctypes import (
     _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure
+    cast, cdll, POINTER, Structure, string_at
 )
 from datetime import datetime
 import gc
@@ -28,7 +29,9 @@ class _LoadEntityStatus(Structure):
     _fields_ = [
         ("loaded", c_bool),
         ("message", POINTER(c_char)),
-        ("version", POINTER(c_char))
+        ("version", POINTER(c_char)),
+        ("entity_path", POINTER(POINTER(c_char))),
+        ("entity_path_len", c_size_t)
     ]
 
 
@@ -53,10 +56,14 @@ class LoadEntityStatus:
             self.loaded = True
             self.message = ""
             self.version = ""
+            self.entity_path = []
         else:
             self.loaded = bool(c_status.loaded)
             self.message = api.char_p_to_str(c_status.message)
             self.version = api.char_p_to_str(c_status.version)
+            self.entity_path = [api.char_p_to_str(c_status.entity_path[i]) for i in range(c_status.entity_path_len)]
+            api.amlg.DeleteString(cast(c_status.entity_path, c_char_p))
+
 
     def __str__(self) -> str:
         """
@@ -67,7 +74,11 @@ class LoadEntityStatus:
         str
             The human-readable string representation.
         """
-        return f"{self.loaded},\"{self.message}\",\"{self.version}\""
+        ep = ""
+        if self.entity_path:
+            eps = (f'"{step}"' for step in self.entity_path)
+            ep = f",[{','.join(eps)}]"
+        return f"{self.loaded},\"{self.message}\",\"{self.version}\"{ep}"
 
 
 class _ResultWithLog(Structure):
@@ -803,7 +814,8 @@ class Amalgam:
         persist: bool = False,
         json_file_params: str = "",
         write_log: str = "",
-        print_log: str = ""
+        print_log: str = "",
+        entity_path: list[str] | None = None,
     ) -> LoadEntityStatus:
         """
         Load an entity from an amalgam source file.
@@ -829,6 +841,9 @@ class Amalgam:
         print_log : str, default ""
             Path to the print log. If empty string, the print log is
             not generated.
+        entity_path: list[str], optional
+            If provided and non-empty, load the content into an entity
+            contained within `handle` at this path.
 
         Returns
         -------
@@ -836,7 +851,8 @@ class Amalgam:
             Status of LoadEntity call.
         """
         self.amlg.LoadEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
+            c_size_t]
         self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         file_path_buf = self.str_to_char_p(file_path)
@@ -844,18 +860,26 @@ class Amalgam:
         json_file_params_buf = self.str_to_char_p(json_file_params)
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
+        entity_path_p = None
+        entity_path_len = 0
+
+        if entity_path is not None and len(entity_path) > 0:
+            entity_path_len = len(entity_path)
+            entity_path_p = (c_char_p * entity_path_len)()
+            for i, entry in enumerate(entity_path):
+                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
 
         self.load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(file_path)}\" "
             f"\"{self.escape_double_quotes(file_type)}\" {str(persist).lower()} "
             f"{json_lib.dumps(json_file_params)} "
-            f"\"{write_log}\" \"{print_log}\""
+            f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
         ).encode()
         self._log_execution(self.load_command_log_entry)
         result = LoadEntityStatus(self, self.amlg.LoadEntity(
             handle_buf, file_path_buf, file_type_buf, persist,
-            json_file_params_buf, write_log_buf, print_log_buf))
+            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
         self._log_reply(result)
 
         del handle_buf
@@ -864,6 +888,98 @@ class Amalgam:
         del json_file_params_buf
         del write_log_buf
         del print_log_buf
+        if entity_path_p is not None:
+            for i in range(entity_path_len):
+                entry_buf = entity_path_p[i]
+                del entry_buf
+            del entity_path_p
+        self.gc()
+
+        return result
+
+    def load_entity_from_memory(
+        self,
+        handle: str,
+        contents: bytes,
+        *,
+        file_type: str,
+        json_file_params: str = "",
+        write_log: str = "",
+        print_log: str = "",
+        entity_path: list[str] | None = None,
+    ) -> LoadEntityStatus:
+        """
+        Load an entity from an in-memory buffer.
+
+        Parameters
+        ----------
+        handle : str
+            The handle to assign the entity.
+        contents : bytes
+            The content to load.
+        file_type : str
+            The type of file to store, typically ``"amlg"`` for plain-text Amalgam or ``"caml"``
+            for binary compressed Amalgam.
+        json_file_params : str, default ""
+            Either empty string or a string of json specifying a set of key-value pairs
+            which are parameters specific to the file type.  See Amalgam documentation
+            for details of allowed parameters.
+        write_log : str, default ""
+            Path to the write log. If empty string, the write log is
+            not generated.
+        print_log : str, default ""
+            Path to the print log. If empty string, the print log is
+            not generated.
+        entity_path: list[str], optional
+            If provided and non-empty, load the content into an entity
+            contained within `handle` at this path.
+
+        Returns
+        -------
+        LoadEntityStatus
+            Status of LoadEntity call.
+        """
+        self.amlg.LoadEntityFromMemory.argtypes = [
+            c_char_p, c_void_p, c_size_t, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
+            c_size_t]
+        self.amlg.LoadEntityFromMemory.restype = _LoadEntityStatus
+        handle_buf = self.str_to_char_p(handle)
+        file_type_buf = self.str_to_char_p(file_type)
+        json_file_params_buf = self.str_to_char_p(json_file_params)
+        write_log_buf = self.str_to_char_p(write_log)
+        print_log_buf = self.str_to_char_p(print_log)
+        entity_path_p = None
+        entity_path_len = 0
+
+        if entity_path is not None and len(entity_path) > 0:
+            entity_path_len = len(entity_path)
+            entity_path_p = (c_char_p * entity_path_len)()
+            for i, entry in enumerate(entity_path):
+                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
+
+        self.load_command_log_entry = (
+            f"LOAD_ENTITY_FROM_MEMORY \"{self.escape_double_quotes(handle)}\" "
+            f"\"{b64encode(contents).decode()}\" "
+            f"\"{self.escape_double_quotes(file_type)}\" false "
+            f"{json_lib.dumps(json_file_params)} "
+            f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
+        ).encode()
+        self._log_execution(self.load_command_log_entry)
+        result = LoadEntityStatus(self, self.amlg.LoadEntityFromMemory(
+            handle_buf, contents, len(contents), file_type_buf, False,
+            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
+        self._log_reply(result)
+
+        del handle_buf
+        del file_type_buf
+        del json_file_params_buf
+        del write_log_buf
+        del print_log_buf
+        if entity_path_p is not None:
+            for i in range(entity_path_len):
+                entry_buf = entity_path_p[i]
+                del entry_buf
+            del entity_path_p
         self.gc()
 
         return result
@@ -1050,6 +1166,7 @@ class Amalgam:
         file_type: str = "",
         persist: bool = False,
         json_file_params: str = "",
+        entity_path: list[str] | None = None,
     ):
         """
         Store entity to the file type specified within file_path.
@@ -1069,25 +1186,115 @@ class Amalgam:
             Either empty string or a string of json specifying a set of key-value pairs
             which are parameters specific to the file type.  See Amalgam documentation
             for details of allowed parameters.
+        entity_path: list[str], optional
+            If provided and non-empty, store the content from an entity
+            contained within `handle` at this path.
         """
         self.amlg.StoreEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p]
+            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
+        self.amlg.StoreEntity.restype = None
         handle_buf = self.str_to_char_p(handle)
         file_path_buf = self.str_to_char_p(file_path)
         file_type_buf = self.str_to_char_p(file_type)
         json_file_params_buf = self.str_to_char_p(json_file_params)
+        entity_path_p = None
+        entity_path_len = 0
+
+        if entity_path is not None and len(entity_path) > 0:
+            entity_path_len = len(entity_path)
+            entity_path_p = (c_char_p * entity_path_len)()
+            for i, entry in enumerate(entity_path):
+                entity_path_p[i] = self.str_to_char_p(entry)
 
         self._log_execution_std(b"STORE_ENTITY", handle, file_path, file_type,
-                                suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)}")
+                                suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
         self.amlg.StoreEntity(
-            handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf)
+            handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
         self._log_reply(None)
 
         del handle_buf
         del file_path_buf
         del file_type_buf
         del json_file_params_buf
+        if entity_path_p is not None:
+            for i in range(entity_path_len):
+                entry_buf = entity_path_p[i]
+                del entry_buf
+            del entity_path_p
         self.gc()
+
+    def store_entity_to_memory(
+        self,
+        handle: str,
+        *,
+        file_type: str,
+        json_file_params: str = "",
+        entity_path: list[str] | None = None,
+    ) -> bytes | None:
+        """
+        Store entity to memory as a bytes object.
+
+        Parameters
+        ----------
+        handle : str
+            The handle of the amalgam entity.
+        file_type : str
+            The type of file to store, typically ``"amlg"`` for plain-text Amalgam or ``"caml"``
+            for binary compressed Amalgam.
+        json_file_params : str, default ""
+            Either empty string or a string of json specifying a set of key-value pairs
+            which are parameters specific to the file type.  See Amalgam documentation
+            for details of allowed parameters.
+        entity_path: list[str], optional
+            If provided and non-empty, store the content from an entity
+            contained within `handle` at this path.
+
+        Returns
+        -------
+        bytes | None
+            The serialized entity contents, or None on an error.
+        """
+        self.amlg.StoreEntityToMemory.argtypes = [
+            c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
+        self.amlg.StoreEntityToMemory.restype = None
+        handle_buf = self.str_to_char_p(handle)
+        data_p = c_void_p(None)
+        data_len = c_size_t(0)
+        file_type_buf = self.str_to_char_p(file_type)
+        json_file_params_buf = self.str_to_char_p(json_file_params)
+        entity_path_p = None
+        entity_path_len = 0
+
+        if entity_path is not None and len(entity_path) > 0:
+            entity_path_len = len(entity_path)
+            entity_path_p = (c_char_p * entity_path_len)()
+            for i, entry in enumerate(entity_path):
+                entity_path_p[i] = self.str_to_char_p(entry)
+
+        self._log_execution(f"STORE_ENTITY_TO_MEMORY \"{self.escape_double_quotes(handle)}\" false {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"".encode())
+        self.amlg.StoreEntityToMemory(
+            handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf, entity_path_p, entity_path_len)
+
+        result = None
+        if data_p.value is not None:
+            result = string_at(data_p.value, data_len.value)
+            self.amlg.DeleteString.argtypes = [c_char_p]
+            self.amlg.DeleteString.restype = None
+            self.amlg.DeleteString(cast(data_p, c_char_p))
+            self._log_reply(b64encode(result).decode())
+        else:
+            self._log_reply(None)
+
+        del handle_buf
+        del file_type_buf
+        del json_file_params_buf
+        if entity_path_p is not None:
+            for i in range(entity_path_len):
+                entry_buf = entity_path_p[i]
+                del entry_buf
+            del entity_path_p
+        self.gc()
+        return result
 
     def destroy_entity(
         self,
