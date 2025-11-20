@@ -1167,7 +1167,7 @@ class Amalgam:
         persist: bool = False,
         json_file_params: str = "",
         entity_path: list[str] | None = None,
-    ):
+    ) -> bool:
         """
         Store entity to the file type specified within file_path.
 
@@ -1189,10 +1189,15 @@ class Amalgam:
         entity_path: list[str], optional
             If provided and non-empty, store the content from an entity
             contained within `handle` at this path.
+
+        Returns
+        -------
+        bool
+            True if the entity file was saved successfully, False otherwise.
         """
         self.amlg.StoreEntity.argtypes = [
             c_char_p, c_char_p, c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntity.restype = None
+        self.amlg.StoreEntity.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         file_path_buf = self.str_to_char_p(file_path)
         file_type_buf = self.str_to_char_p(file_type)
@@ -1208,9 +1213,9 @@ class Amalgam:
 
         self._log_execution_std(b"STORE_ENTITY", handle, file_path, file_type,
                                 suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
-        self.amlg.StoreEntity(
+        result = self.amlg.StoreEntity(
             handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
-        self._log_reply(None)
+        self._log_reply(result)
 
         del handle_buf
         del file_path_buf
@@ -1222,6 +1227,7 @@ class Amalgam:
                 del entry_buf
             del entity_path_p
         self.gc()
+        return result
 
     def store_entity_to_memory(
         self,
@@ -1256,7 +1262,7 @@ class Amalgam:
         """
         self.amlg.StoreEntityToMemory.argtypes = [
             c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntityToMemory.restype = None
+        self.amlg.StoreEntityToMemory.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         data_p = c_void_p(None)
         data_len = c_size_t(0)
