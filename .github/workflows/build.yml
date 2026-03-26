@@ -199,14 +199,14 @@ jobs:
 
     - name: Upload Tarball Artifact
       if: matrix.plat == 'any'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: amalgam_lang-${{ needs.metadata.outputs.version }}
         path: dist/amalgam_lang-*.tar.gz
         if-no-files-found: error
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}
         path: dist/amalgam_lang-*.whl
@@ -293,7 +293,7 @@ jobs:
     steps:
 
     - name: Download Artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         path: ./tmp
 
@@ -370,7 +370,7 @@ jobs:
           sleep 15
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./tmp
 
