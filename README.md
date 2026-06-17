@@ -1,14 +1,8 @@
-# Amalgam&trade;
+# Amalgam&reg;
 
+[Amalgam&reg;](https://github.com/howsoai/amalgam) is an LLM-ready, tree-structured language for safe, sandboxed code generation, manipulation, and advanced information-theoretic inference.  Unlike traditional languages that prioritize developer shorthand, Amalgam focuses on code-data symmetry and semantic consistency.  This package supports directly calling the language via Python.
 
-Amalgam&trade; is a domain specific language ([DSL](https://en.wikipedia.org/wiki/Domain-specific_language)) developed primarily for [genetic programming](https://en.wikipedia.org/wiki/Generic_programming) and [instance based machine learning](https://en.wikipedia.org/wiki/Instance-based_learning), but also for simulation, agent based modeling, data storage and retrieval, the mathematics of probability theory and information theory, and game content and AI. The language format is somewhat LISP-like in that it uses parenthesized list format with prefix notation and is geared toward functional programming, where there is a one-to-one mapping between the code and the corresponding parse tree. The [Howso Engine](https://github.com/howsoai/howso-engine/tree/main) is an example of a program written in Amalgam.
-
-
-## Resources
-- [Amalgam](https://github.com/howsoai/amalgam)
-
-## General Overview
-Coding in [Amalgam](https://github.com/howsoai/amalgam) can be done natively as demonstrated in the [Amalgam User Guide](https://github.com/howsoai/amalgam/blob/main/AMALGAM-BEGINNER-GUIDE.md) or through this Amalgam&trade; Python wrapper. The Python wrapper handles the binaries for the user so the user just needs to worry about the code. 
+Coding in [Amalgam](https://github.com/howsoai/amalgam) can be done natively as demonstrated in the [Amalgam User Guide](https://github.com/howsoai/amalgam/blob/main/AMALGAM-BEGINNER-GUIDE.md) or through this Python wrapper.
 
 
 ## Supported Platforms
@@ -17,6 +11,7 @@ Compatible with Python versions: 3.11, 3.12, 3.13, and 3.14.
 
 #### Operating Systems
 
+Binaries are built for the following operating systems, though in theory they could be built for virtually any modern system.
 | OS      | x86_64 | arm64 |
 |---------|--------|-------|
 | Windows | Yes    | No    |
