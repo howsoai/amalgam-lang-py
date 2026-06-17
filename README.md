@@ -1,6 +1,6 @@
 # Amalgam&reg;
 
-[Amalgam&reg;](https://github.com/howsoai/amalgam) is an LLM-ready, tree-structured language for safe, sandboxed code generation, manipulation, and advanced information-theoretic inference.  Unlike traditional languages that prioritize developer shorthand, Amalgam focuses on code-data symmetry and semantic consistency.  This package supports directly calling the language via Python.
+Amalgam&reg; is an LLM-ready, tree-structured language for safe, sandboxed code generation, manipulation, and advanced information-theoretic inference.  Unlike traditional languages that prioritize developer shorthand, Amalgam focuses on code-data symmetry and semantic consistency.  These properties give it unique strengths in a wide variety of domains, including [genetic programming](https://en.wikipedia.org/wiki/Generic_programming), [instance based machine learning](https://en.wikipedia.org/wiki/Instance-based_learning), simulation, agent-based modeling, data storage and retrieval, the mathematics of probability theory and information theory, and game content and AI.  This package supports directly calling the language via Python.
 
 Coding in [Amalgam](https://github.com/howsoai/amalgam) can be done natively as demonstrated in the [Amalgam User Guide](https://github.com/howsoai/amalgam/blob/main/AMALGAM-BEGINNER-GUIDE.md) or through this Python wrapper.
 
