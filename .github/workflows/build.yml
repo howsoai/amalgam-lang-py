@@ -320,7 +320,7 @@ jobs:
     if: inputs.build-type == 'release'
     runs-on: ubuntu-latest
     outputs:
-      amlg-ver: ${{ steps.read-version-json.outputs.AMLG_VER }}
+      amlg-ver: ${{ steps.read-version-json.outputs.amlg-ver }}
     steps:
       - uses: actions/checkout@v6
 
