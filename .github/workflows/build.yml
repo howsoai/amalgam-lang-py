@@ -327,7 +327,7 @@ jobs:
       - name: Get Amalgam version
         id: read-version-json
         run: |
-          amlg_version=$(jq -r '.version.amalgam' version.json)
+          amlg_version=$(jq -r '.dependencies.amalgam' version.json)
           echo "Releasing with Amalgam $amlg_version"
           echo "amlg-ver=$amlg_version" >> $GITHUB_OUTPUT
 
