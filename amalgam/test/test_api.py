@@ -161,6 +161,24 @@ def test_logging_suffix(amalgam_factory):
     assert amlg.trace.getvalue() == b"""FOO "bar" {"baz": "quux"}\n"""
 
 
+def test_logging_toggle_off_and_on(amalgam_factory):
+    """Tracing can be suspended and resumed by assigning to `trace`."""
+    amlg = amalgam_factory()
+    first = BytesIO()
+    amlg.trace = first
+    amlg._log_execution(b"BEFORE")
+
+    # Suspending must not close the outgoing file -- callers hand it back.
+    amlg.trace = None
+    assert amlg.trace is None
+    assert not first.closed
+    amlg._log_execution(b"WHILE_OFF")
+
+    amlg.trace = first
+    amlg._log_execution(b"AFTER")
+    assert first.getvalue() == b"BEFORE\nAFTER\n"
+
+
 def test_logging_logged(mocker, amalgam_factory):
     amlg = amalgam_factory()
     json = amlg.str_to_char_p("{}")
