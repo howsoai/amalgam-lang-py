@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 import platform
 import re
+import threading
 import typing as t
 import warnings
 
@@ -50,7 +51,7 @@ class LoadEntityStatus:
         _LoadEntityStatus instance.
     """
 
-    def __init__(self, api: Amalgam, c_status: t.Optional[_LoadEntityStatus] = None):
+    def __init__(self, api: Amalgam, c_status: t.Optional[_LoadEntityStatus] = None):  # pyright: ignore[reportMissingSuperCall]
         """Initialize LoadEntityStatus."""
         if c_status is None:
             self.loaded = True
@@ -213,6 +214,19 @@ class Amalgam:
         **kwargs
     ):
         """Initialize Amalgam instance."""
+        # Guards all trace-file state: self._trace, self.execution_trace_filepath
+        # and self.load_command_log_entry. Re-entrant so a caller may bracket a
+        # whole command/reply group while the _log_* helpers each acquire it
+        # again. Created first: set_max_num_threads() below writes to the trace.
+        #
+        # self._trace may be swapped at any time -- by reset_trace(), or by a
+        # caller assigning to the `trace` property to toggle tracing off and
+        # back on again. So the _log_* helpers check it twice: once unlocked,
+        # to skip the whole block cheaply when tracing is off, and again under
+        # the lock, because it may have been set to None while they were
+        # waiting to acquire.
+        self._trace_lock = threading.RLock()
+
         if len(kwargs):
             warnings.warn(f'Unexpected keyword arguments '
                           f'[{", ".join(list(kwargs.keys()))}] '
@@ -248,11 +262,14 @@ class Amalgam:
                     )
                     counter += 1
 
-            self.trace = self.execution_trace_filepath.open("wb+")
+            # NOTE: Even though there are getters and setters for the public
+            #       API, this class continues to directly access `_trace` for
+            #       performance reasons.
+            self._trace = self.execution_trace_filepath.open("wb+")
             _logger.debug("Opening Amalgam trace file: "
                           f"{self.execution_trace_filepath}")
         else:
-            self.trace = None
+            self._trace = None
 
         _logger.debug(f"Loading amalgam library: {self.library_path}")
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
@@ -264,6 +281,27 @@ class Amalgam:
         self.gc_interval = gc_interval
         self.op_count = 0
         self.load_command_log_entry: bytes | None = None
+
+    @property
+    def trace(self) -> t.BinaryIO | None:
+        """
+        The open execution trace file, or None when tracing is disabled.
+
+        Assigning to this swaps the destination under the lock that guards
+        trace writes, so it is safe to call while other threads are logging.
+        Assign None to suspend tracing and a file object to resume it.
+
+        Note that assigning does not close the outgoing file -- the caller owns
+        it, so it can be handed back later to resume. Use
+        :func:`~api.Amalgam.reset_trace` to roll over to a fresh file instead.
+        """
+        return self._trace
+
+    @trace.setter
+    def trace(self, value: t.BinaryIO | None) -> None:
+        """Swap the execution trace file under the trace lock."""
+        with self._trace_lock:
+            self._trace = value
 
     @classmethod
     def _get_allowed_postfixes(cls, library_dir: Path) -> list[str]:
@@ -515,31 +553,32 @@ class Amalgam:
         file : str
             The file name for the new execution trace.
         """
-        if self.trace is None:
-            # Trace was not enabled
-            return
-        _logger.debug(f"Execution trace file being reset: "
-                      f"{self.execution_trace_filepath} to be closed ...")
-        # Write exit command.
-        self.trace.write(b"EXIT\n")
-        self.trace.close()
-        self.execution_trace_filepath = Path(self.execution_trace_dir, file)
+        with self._trace_lock:
+            if self._trace is None:
+                # Trace was not enabled
+                return
+            _logger.debug(f"Execution trace file being reset: "
+                          f"{self.execution_trace_filepath} to be closed ...")
+            # Write exit command.
+            self._trace.write(b"EXIT\n")
+            self._trace.close()
+            self.execution_trace_filepath = Path(self.execution_trace_dir, file)
 
-        # increment a counter on the file name, if file already exists..
-        if not self.append_trace_file:
-            counter = 1
-            while self.execution_trace_filepath.exists():
-                self.execution_trace_filepath = Path(
-                    self.execution_trace_dir, f'{file}.{counter}')
-                counter += 1
+            # increment a counter on the file name, if file already exists..
+            if not self.append_trace_file:
+                counter = 1
+                while self.execution_trace_filepath.exists():
+                    self.execution_trace_filepath = Path(
+                        self.execution_trace_dir, f'{file}.{counter}')
+                    counter += 1
 
-        self.trace = self.execution_trace_filepath.open("wb+")
-        _logger.debug(f"New trace file: {self.execution_trace_filepath} "
-                      f"opened.")
-        # Write load command used to instantiate the amalgam instance.
-        if self.load_command_log_entry is not None:
-            self.trace.write(self.load_command_log_entry + b"\n")
-        self.trace.flush()
+            self._trace = self.execution_trace_filepath.open("wb+")
+            _logger.debug(f"New trace file: {self.execution_trace_filepath} "
+                          f"opened.")
+            # Write load command used to instantiate the amalgam instance.
+            if self.load_command_log_entry is not None:
+                self._trace.write(self.load_command_log_entry + b"\n")
+            self._trace.flush()
 
     def __str__(self) -> str:
         """Return a human-readable string representation."""
@@ -548,14 +587,18 @@ class Amalgam:
 
     def __del__(self):
         """Implement a "destructor" method to finalize log files, if any."""
-        if (
-            getattr(self, 'debug', False) and
-            getattr(self, 'trace', None) is not None
-        ):
-            try:
-                self.trace.write(b"EXIT\n")
-            except Exception:  # noqa - deliberately broad
-                pass
+        # May run on a partially-constructed instance, so nothing here can
+        # assume __init__ finished.
+        lock = getattr(self, '_trace_lock', None)
+        if lock is None or getattr(self, '_trace', None) is None:
+            return
+        try:
+            with lock:
+                if self._trace:
+                    self._trace.write(b"EXIT\n")
+                    self._trace.flush()
+        except Exception:  # noqa - deliberately broad
+            pass
 
     def _log_comment(self, comment: str):
         """
@@ -568,9 +611,15 @@ class Amalgam:
         reply : str
             The raw reply string to log.
         """
-        if self.trace:
-            self.trace.write(b"# NOTE >" + comment.encode() + b"\n")
-            self.trace.flush()
+        # NOTE: We check if `self._trace` is set to avoid setting a lock when
+        #       it isn't needed. We check again inside the lock, because the
+        #       state of `self._trace` may have changed while waiting to
+        #       acquire the lock.
+        if self._trace:
+            with self._trace_lock:
+                if self._trace:
+                    self._trace.write(b"# NOTE >" + comment.encode() + b"\n")
+                    self._trace.flush()
 
     def _log_reply(self, reply: t.Any):
         """
@@ -583,15 +632,18 @@ class Amalgam:
         reply : Any
             The raw reply string to log.
         """
-        if self.trace:
-            if isinstance(reply, ResultWithLog):
-                if reply.json:
-                    self.trace.write(b"# RESULT >" + reply.json + b"\n")
-                if reply.log:
-                    self.trace.write(b"# LOG >" + reply.log + b"\n")
-            else:
-                self.trace.write(b"# RESULT >" + str(reply).encode() + b"\n")
-            self.trace.flush()
+        # See note in _log_comment()
+        if self._trace:
+            with self._trace_lock:
+                if self._trace:
+                    if isinstance(reply, ResultWithLog):
+                        if reply.json:
+                            self._trace.write(b"# RESULT >" + reply.json + b"\n")
+                        if reply.log:
+                            self._trace.write(b"# LOG >" + reply.log + b"\n")
+                    else:
+                        self._trace.write(b"# RESULT >" + str(reply).encode() + b"\n")
+                    self._trace.flush()
 
     def _log_time(self, label: str):
         """
@@ -602,11 +654,15 @@ class Amalgam:
         label: str
             A string to annotate the timestamped trace entry
         """
-        if self.trace:
-            dt = datetime.now()
-            time_str = f"{label} {dt:%Y-%m-%d %H:%M:%S},{f'{dt:%f}'[:3]}"
-            self.trace.write(b"# TIME " + time_str.encode() + b"\n")
-            self.trace.flush()
+        # See note in _log_comment()
+        if self._trace:
+            with self._trace_lock:
+                if self._trace:
+                    dt = datetime.now()
+                    time_str = (f"{label} {dt:%Y-%m-%d %H:%M:%S},{f'{dt:%f}'[:3]} "
+                                f"tid={threading.get_ident()}")
+                    self._trace.write(b"# TIME " + time_str.encode() + b"\n")
+                    self._trace.flush()
 
     def _log_execution(self, execution_string: bytes):
         """
@@ -625,9 +681,12 @@ class Amalgam:
                 No formatting checks are performed, it is assumed the execution
                 string passed is valid.
         """
-        if self.trace:
-            self.trace.write(execution_string + b"\n")
-            self.trace.flush()
+        # See note in _log_comment()
+        if self._trace:
+            with self._trace_lock:
+                if self._trace:
+                    self._trace.write(execution_string + b"\n")
+                    self._trace.flush()
 
     def _log_execution_std(self, command: bytes, *args: str, suffix: str | bytes | None = None) -> None:
         """
@@ -644,16 +703,18 @@ class Amalgam:
         suffix : bytes, optional
             Arbitrary binary data to append to the command string unprocessed.
         """
-        if not self.trace:
-            return
-        words = [b"\"" + self.escape_double_quotes(arg).encode() + b"\"" for arg in args]
-        words.insert(0, command)
-        if isinstance(suffix, str):
-            words.append(suffix.encode())
-        elif isinstance(suffix, bytes):
-            words.append(suffix)
-        self.trace.write(b" ".join(words) + b"\n")
-        self.trace.flush()
+        # See note in _log_comment()
+        if self._trace:
+            with self._trace_lock:
+                if self._trace:
+                    words = [b"\"" + self.escape_double_quotes(arg).encode() + b"\"" for arg in args]
+                    words.insert(0, command)
+                    if isinstance(suffix, str):
+                        words.append(suffix.encode())
+                    elif isinstance(suffix, bytes):
+                        words.append(suffix)
+                    self._trace.write(b" ".join(words) + b"\n")
+                    self._trace.flush()
 
     def gc(self):
         """Force garbage collection when called if self.force_gc is set."""
