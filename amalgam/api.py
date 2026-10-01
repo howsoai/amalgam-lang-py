@@ -544,6 +544,32 @@ class Amalgam:
         result = self.amlg.SetMaxNumThreads(max_num_threads)
         self._log_reply(result)
 
+    def get_num_active_threads(
+        self
+    ) -> int:
+        """
+        Returns the current number of threads actively executing.
+
+        This is an instantaneous measurement and is only a handful of CPU instructions.
+        Due to the nature of task dispatching and task decomposition, it is possible
+        that the number of active threads can change very rapidly.  the best way to use
+        this method is to aggregate many samples per second with some form of average
+        or rolling average over a time period.
+        
+        This does not include OpenMP threads in the count.
+
+        Returns
+        -------
+        int
+            The current number of active threads.
+        """
+        self.amlg.GetNumActiveThreads.argtypes = []
+        self.amlg.GetNumActiveThreads.restype = c_size_t
+
+        result = self.amlg.GetNumActiveThreads()
+
+        return result
+
     def reset_trace(self, file: str):
         """
         Close the open trace file and opens a new one with the specified name.
