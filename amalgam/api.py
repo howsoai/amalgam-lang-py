@@ -570,6 +570,60 @@ class Amalgam:
 
         return result
 
+    def get_garbage_collection_params(self) -> bytes:
+        """
+        Get native garbage-collection parameters as JSON bytes.
+
+        Parameters are global to the library and shared across entities.
+
+        Returns
+        -------
+        bytes
+            JSON containing the current parameters.
+        """
+        self.amlg.GetGarbageCollectionParams.argtypes = []
+        self.amlg.GetGarbageCollectionParams.restype = POINTER(c_char)
+
+        self._log_execution(b"GET_GARBAGE_COLLECTION_PARAMS")
+        result = self.char_p_to_bytes(
+            self.amlg.GetGarbageCollectionParams()
+        )
+        self._log_reply(result)
+
+        return result
+
+    def set_garbage_collection_params(
+        self,
+        json_params: str | bytes
+    ) -> None:
+        """
+        Update native garbage-collection parameters from JSON.
+
+        Parameters are global to the library and shared across entities.
+        Omitted keys remain unchanged and unknown keys are ignored. Values
+        outside allowed ranges reset that parameter to its default.
+
+        Parameters
+        ----------
+        json_params : str or bytes
+            A JSON object containing any subset of
+            min_gc_nodes_threshold, max_gc_nodes_threshold,
+            extra_memory_capacity_factor, min_memory_retention_factor,
+            and alloc_expansion_factor.
+        """
+        self.amlg.SetGarbageCollectionParams.argtypes = [c_char_p]
+        self.amlg.SetGarbageCollectionParams.restype = None
+        params_buf = self.str_to_char_p(json_params)
+
+        self._log_execution_std(
+            b"SET_GARBAGE_COLLECTION_PARAMS",
+            suffix=json_params
+        )
+        self.amlg.SetGarbageCollectionParams(params_buf)
+        self._log_reply(None)
+
+        del params_buf
+
     def reset_trace(self, file: str):
         """
         Close the open trace file and opens a new one with the specified name.
