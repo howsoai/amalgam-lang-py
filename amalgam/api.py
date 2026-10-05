@@ -548,14 +548,14 @@ class Amalgam:
         self
     ) -> int:
         """
-        Returns the current number of threads actively executing.
+        Return the current number of threads actively executing.
 
         This is an instantaneous measurement and is only a handful of CPU instructions.
         Due to the nature of task dispatching and task decomposition, it is possible
         that the number of active threads can change very rapidly.  the best way to use
         this method is to aggregate many samples per second with some form of average
         or rolling average over a time period.
-        
+
         This does not include OpenMP threads in the count.
 
         Returns
