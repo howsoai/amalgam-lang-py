@@ -92,3 +92,39 @@ def bulk_operations(amlg):
     _logger.info("completed in " + str(avg_time / rounds) + "s")
     _logger.info(str(avg_ops / rounds) + " operations per second")
     return True
+
+@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
+def test_runtime_performance_control(amalgam_lib):
+    active_threads = amalgam_lib.get_num_active_threads()
+    assert isinstance(active_threads, int)
+    assert active_threads >= 1
+
+    expected_keys = {
+        "min_gc_nodes_threshold",
+        "max_gc_nodes_threshold",
+        "extra_memory_capacity_factor",
+        "min_memory_retention_factor",
+        "alloc_expansion_factor",
+    }
+    original = amalgam_lib.get_garbage_collection_params()
+    original_params = json.loads(original)
+    assert set(original_params) == expected_keys
+
+    updated_threshold = original_params["min_gc_nodes_threshold"] + 1
+    try:
+        amalgam_lib.set_garbage_collection_params(json.dumps({
+            "min_gc_nodes_threshold": updated_threshold,
+        }))
+        effective = json.loads(
+            amalgam_lib.get_garbage_collection_params()
+        )
+        assert effective == {
+            **original_params,
+            "min_gc_nodes_threshold": updated_threshold,
+        }
+    finally:
+        amalgam_lib.set_garbage_collection_params(original)
+
+    assert json.loads(
+        amalgam_lib.get_garbage_collection_params()
+    ) == original_params
