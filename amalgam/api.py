@@ -544,6 +544,86 @@ class Amalgam:
         result = self.amlg.SetMaxNumThreads(max_num_threads)
         self._log_reply(result)
 
+    def get_num_active_threads(
+        self
+    ) -> int:
+        """
+        Return the current number of threads actively executing.
+
+        This is an instantaneous measurement and is only a handful of CPU instructions.
+        Due to the nature of task dispatching and task decomposition, it is possible
+        that the number of active threads can change very rapidly.  the best way to use
+        this method is to aggregate many samples per second with some form of average
+        or rolling average over a time period.
+
+        This does not include OpenMP threads in the count.
+
+        Returns
+        -------
+        int
+            The current number of active threads.
+        """
+        self.amlg.GetNumActiveThreads.argtypes = []
+        self.amlg.GetNumActiveThreads.restype = c_size_t
+
+        result = self.amlg.GetNumActiveThreads()
+
+        return result
+
+    def get_garbage_collection_params(self) -> bytes:
+        """
+        Get native garbage-collection parameters as JSON bytes.
+
+        Parameters are global to the library and shared across entities.
+
+        Returns
+        -------
+        bytes
+            JSON containing the current parameters.
+        """
+        self.amlg.GetGarbageCollectionParams.argtypes = []
+        self.amlg.GetGarbageCollectionParams.restype = POINTER(c_char)
+
+        self._log_execution(b"GET_GARBAGE_COLLECTION_PARAMS")
+        result = self.char_p_to_bytes(
+            self.amlg.GetGarbageCollectionParams()
+        )
+        self._log_reply(result)
+
+        return result
+
+    def set_garbage_collection_params(
+        self,
+        json_params: str | bytes
+    ) -> None:
+        """
+        Update native garbage-collection parameters from JSON.
+
+        Parameters are global to the library and shared across entities.
+        Omitted keys remain unchanged and unknown keys are ignored. Values
+        outside allowed ranges reset that parameter to its default.
+
+        Parameters
+        ----------
+        json_params : str or bytes
+            A JSON object containing any subset of
+            min_gc_nodes_threshold, max_gc_nodes_threshold,
+            extra_memory_capacity_factor, min_memory_retention_factor,
+            and alloc_expansion_factor.
+        """
+        self.amlg.SetGarbageCollectionParams.argtypes = [c_char_p]
+        self.amlg.SetGarbageCollectionParams.restype = None
+        params_buf = self.str_to_char_p(json_params)
+
+        self._log_execution_std(
+            b"SET_GARBAGE_COLLECTION_PARAMS",
+            suffix=json_params
+        )
+        self.amlg.SetGarbageCollectionParams(params_buf)
+        self._log_reply(None)
+
+        del params_buf
+
     def reset_trace(self, file: str):
         """
         Close the open trace file and opens a new one with the specified name.
