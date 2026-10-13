@@ -1550,7 +1550,11 @@ class Amalgam:
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
+        # The native call only reads JSON; retain bytes without copying to a mutable buffer.
+        json_buf = json.encode('utf-8') if isinstance(json, str) else json
+        # Preserve validation of unsupported inputs, including null pointers.
+        if not isinstance(json_buf, bytes):
+            json_buf = self.str_to_char_p(json_buf)
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
@@ -1595,7 +1599,11 @@ class Amalgam:
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
+        # The native call only reads JSON; retain bytes without copying to a mutable buffer.
+        json_buf = json.encode('utf-8') if isinstance(json, str) else json
+        # Preserve validation of unsupported inputs, including null pointers.
+        if not isinstance(json_buf, bytes):
+            json_buf = self.str_to_char_p(json_buf)
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON_LOGGED", handle, label, suffix=json)
