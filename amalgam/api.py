@@ -1551,10 +1551,12 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         # The native call only reads JSON; retain bytes without copying to a mutable buffer.
-        json_buf = json.encode('utf-8') if isinstance(json, str) else json
-        # Preserve validation of unsupported inputs, including null pointers.
-        if not isinstance(json_buf, bytes):
-            json_buf = self.str_to_char_p(json_buf)
+        if isinstance(json, str):
+            json_buf = json.encode('utf-8')
+        elif isinstance(json, bytes):
+            json_buf = json
+        else:
+            raise TypeError(f'json must be str or bytes, got {type(json).__name__}')
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
@@ -1600,10 +1602,12 @@ class Amalgam:
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         # The native call only reads JSON; retain bytes without copying to a mutable buffer.
-        json_buf = json.encode('utf-8') if isinstance(json, str) else json
-        # Preserve validation of unsupported inputs, including null pointers.
-        if not isinstance(json_buf, bytes):
-            json_buf = self.str_to_char_p(json_buf)
+        if isinstance(json, str):
+            json_buf = json.encode('utf-8')
+        elif isinstance(json, bytes):
+            json_buf = json
+        else:
+            raise TypeError(f'json must be str or bytes, got {type(json).__name__}')
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON_LOGGED", handle, label, suffix=json)

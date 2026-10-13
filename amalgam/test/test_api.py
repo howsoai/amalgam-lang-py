@@ -179,6 +179,49 @@ def test_logging_toggle_off_and_on(amalgam_factory):
     assert first.getvalue() == b"BEFORE\nAFTER\n"
 
 
+@pytest.mark.parametrize('method, native_method', [
+    ('execute_entity_json', 'ExecuteEntityJsonPtr'),
+    ('execute_entity_json_logged', 'ExecuteEntityJsonPtrLogged'),
+])
+@pytest.mark.parametrize('json', ['{"text": "café"}', b'{"value": 1}', '', b''])
+def test_execute_entity_json_input(amalgam_factory, method, native_method, json):
+    """Encode strings as UTF-8 and pass bytes directly to either native call."""
+    amlg = amalgam_factory()
+    native_call = getattr(amlg.amlg, native_method)
+    native_call.return_value = _ResultWithLog() if method.endswith('_logged') else None
+
+    getattr(amlg, method)('handle', 'label', json)
+
+    native_call.assert_called_once()
+    json_arg = native_call.call_args.args[2]
+    if isinstance(json, bytes):
+        assert json_arg is json
+    else:
+        assert json_arg == json.encode('utf-8')
+
+
+@pytest.mark.parametrize('method, native_method', [
+    ('execute_entity_json', 'ExecuteEntityJsonPtr'),
+    ('execute_entity_json_logged', 'ExecuteEntityJsonPtrLogged'),
+])
+@pytest.mark.parametrize('json, type_name', [
+    (None, 'NoneType'),
+    (123, 'int'),
+    ({}, 'dict'),
+    (bytearray(b'{}'), 'bytearray'),
+    (memoryview(b'{}'), 'memoryview'),
+])
+def test_execute_entity_json_invalid_input(amalgam_factory, method, native_method, json, type_name):
+    """Reject unsupported JSON types before entering either native call."""
+    amlg = amalgam_factory()
+
+    with pytest.raises(TypeError) as exc_info:
+        getattr(amlg, method)('handle', 'label', json)
+
+    assert str(exc_info.value) == f'json must be str or bytes, got {type_name}'
+    getattr(amlg.amlg, native_method).assert_not_called()
+
+
 def test_logging_logged(mocker, amalgam_factory):
     amlg = amalgam_factory()
     json = amlg.str_to_char_p("{}")
