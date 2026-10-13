@@ -1,6 +1,7 @@
+from ctypes import c_char_p, c_void_p, cast, CFUNCTYPE, string_at
 from io import BytesIO
 from pathlib import Path, WindowsPath
-from platform import system
+from platform import python_implementation, system
 import warnings
 
 from amalgam import api
@@ -183,12 +184,32 @@ def test_logging_toggle_off_and_on(amalgam_factory):
     ('execute_entity_json', 'ExecuteEntityJsonPtr'),
     ('execute_entity_json_logged', 'ExecuteEntityJsonPtrLogged'),
 ])
-@pytest.mark.parametrize('json', ['{"text": "café"}', b'{"value": 1}', '', b''])
+@pytest.mark.parametrize('json', [
+    '{"value": 1}', '{"text": "café 😀"}', b'{"value": 1}', '', b'',
+    '{}\0trailing', '"café"\0trailing', b'{}\0trailing',
+])
 def test_execute_entity_json_input(amalgam_factory, method, native_method, json):
-    """Encode strings as UTF-8 and pass bytes directly to either native call."""
+    """Preserve values, owners and pointers through ctypes argument conversion."""
+    if python_implementation() == 'CPython':
+        assert api._unicode_as_utf8 is not None
     amlg = amalgam_factory()
     native_call = getattr(amlg.amlg, native_method)
-    native_call.return_value = _ResultWithLog() if method.endswith('_logged') else None
+    expected = json.encode('utf-8') if isinstance(json, str) else json
+    observed = []
+
+    # Receive an address rather than c_char_p's automatic bytes result. Read
+    # only during the call, with the input and argument owners still alive.
+    @CFUNCTYPE(None, c_void_p)
+    def read_argument(address):
+        observed.append((address, string_at(address, len(expected) + 1), string_at(address)))
+
+    read_argument.argtypes = [c_char_p]
+
+    def execute(handle_arg, label_arg, json_arg):
+        read_argument(json_arg)
+        return _ResultWithLog() if method.endswith('_logged') else None
+
+    native_call.side_effect = execute
 
     getattr(amlg, method)('handle', 'label', json)
 
@@ -196,8 +217,44 @@ def test_execute_entity_json_input(amalgam_factory, method, native_method, json)
     json_arg = native_call.call_args.args[2]
     if isinstance(json, bytes):
         assert json_arg is json
+    elif type(json) is str and json.isascii() and api._unicode_as_utf8 is not None:
+        assert isinstance(json_arg, c_char_p)
+        assert json_arg._owner is json
+        assert cast(json_arg, c_void_p).value == api._unicode_as_utf8(json, None) == observed[0][0]
     else:
-        assert json_arg == json.encode('utf-8')
+        assert json_arg == expected
+    assert len(observed) == 1
+    assert observed[0][1:] == (expected + b'\0', expected.split(b'\0')[0])
+
+
+@pytest.mark.parametrize('method, native_method', [
+    ('execute_entity_json', 'ExecuteEntityJsonPtr'),
+    ('execute_entity_json_logged', 'ExecuteEntityJsonPtrLogged'),
+])
+def test_execute_entity_json_surrogate(amalgam_factory, method, native_method):
+    """Preserve strict UTF-8 failures before native execution."""
+    amlg = amalgam_factory()
+    with pytest.raises(UnicodeEncodeError):
+        getattr(amlg, method)('handle', 'label', '\ud800')
+    getattr(amlg.amlg, native_method).assert_not_called()
+
+
+def test_json_to_c_arg_fallback_and_subclasses(mocker):
+    """Keep bytes identity and string encode overrides, including the fallback."""
+    class EncodedString(str):
+        def encode(self, encoding):
+            assert encoding == 'utf-8'
+            return b'override'
+
+    class BytesSubclass(bytes):
+        pass
+
+    value = BytesSubclass(b'{}')
+    assert api._json_to_c_arg(value) is value
+    assert api._json_to_c_arg(EncodedString('ascii')) == b'override'
+    mocker.patch.object(api, '_unicode_as_utf8', None)
+    assert api._json_to_c_arg('ascii\0tail') == b'ascii\0tail'
+    assert api._json_to_c_arg('café') == 'café'.encode('utf-8')
 
 
 @pytest.mark.parametrize('method, native_method', [

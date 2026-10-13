@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from base64 import b64encode
+import ctypes
 from ctypes import (
-    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure, string_at
+    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_ssize_t, c_uint64, c_void_p,
+    cast, cdll, POINTER, py_object, string_at, Structure
 )
 from datetime import datetime
 import gc
@@ -18,6 +19,33 @@ import warnings
 
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
+
+
+# Stable ABI since CPython 3.10. PyDLL keeps the GIL and checks Python errors.
+# Use an independent function object and a raw pointer restype: c_char_p as a
+# restype would copy into bytes and truncate at an embedded NUL.
+_unicode_as_utf8 = None
+if platform.python_implementation() == 'CPython':
+    _unicode_as_utf8 = ctypes.pythonapi['PyUnicode_AsUTF8AndSize']
+    _unicode_as_utf8.argtypes = [py_object, POINTER(c_ssize_t)]
+    _unicode_as_utf8.restype = c_void_p
+
+
+def _json_to_c_arg(value: str | bytes) -> bytes | c_char_p:
+    """Prepare JSON for synchronous, read-only native execution."""
+    if isinstance(value, str):
+        # Exact ASCII str already has UTF-8 storage. Preserve encode overrides
+        # on subclasses and avoid retaining a UTF-8 cache for non-ASCII str.
+        if type(value) is str and value.isascii() and _unicode_as_utf8 is not None:
+            pointer = c_char_p(_unicode_as_utf8(value, None))
+            # c_char_p(address) does not retain the owner. Keep it alive even
+            # while CDLL releases the GIL; native code must not write or retain it.
+            pointer._owner = value
+            return pointer
+        return value.encode('utf-8')
+    if isinstance(value, bytes):
+        return value
+    raise TypeError(f'json must be str or bytes, got {type(value).__name__}')
 
 
 class _LoadEntityStatus(Structure):
@@ -1550,13 +1578,7 @@ class Amalgam:
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        # The native call only reads JSON; retain bytes without copying to a mutable buffer.
-        if isinstance(json, str):
-            json_buf = json.encode('utf-8')
-        elif isinstance(json, bytes):
-            json_buf = json
-        else:
-            raise TypeError(f'json must be str or bytes, got {type(json).__name__}')
+        json_buf = _json_to_c_arg(json)
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
@@ -1601,13 +1623,7 @@ class Amalgam:
             c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        # The native call only reads JSON; retain bytes without copying to a mutable buffer.
-        if isinstance(json, str):
-            json_buf = json.encode('utf-8')
-        elif isinstance(json, bytes):
-            json_buf = json
-        else:
-            raise TypeError(f'json must be str or bytes, got {type(json).__name__}')
+        json_buf = _json_to_c_arg(json)
 
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON_LOGGED", handle, label, suffix=json)
