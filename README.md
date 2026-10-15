@@ -48,6 +48,16 @@ The wrapper handles the Amalgam language binary (so/dll/dylib) automatically for
 amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 ```
 
+### Native backends
+
+The wrapper calls the Amalgam C library through one of two backends: the compiled C extension `amalgam._api`, or a fallback backend that calls the library through `ctypes`. The C extension is faster and uses less memory, because it passes Python `str` and `bytes` buffers to the engine without copying them. The `AMALGAM_PY_BACKEND` environment variable selects one:
+
+- `auto` (the default, also used when the variable is unset or empty) uses the C extension when it is installed and `ctypes` otherwise.
+- `c` uses the C extension, and raises `ImportError` when it is not installed.
+- `ctypes` always uses `ctypes`.
+
+Releases publish `cp311-abi3` wheels that include the C extension for Linux (manylinux, x86_64 and aarch64), macOS (arm64), and Windows (amd64), plus a `py3-none-any` wheel without it that always uses `ctypes`. A source or editable install (`pip install .` or `pip install -e .`) compiles it, which needs a C compiler; without one, the install still succeeds and uses the `ctypes` backend.
+
 ## Testing
 There is a `Pytest` unit test suite located in `amalgam/test`. Most tests load the Amalgam library from `amalgam/lib/{os}/{architecture}` and are skipped when it is not there; link or copy the libraries from a local [Amalgam](https://github.com/howsoai/amalgam) build into that directory, or download a release matching `version.json` and copy its `lib/` files there.
 

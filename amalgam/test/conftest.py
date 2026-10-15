@@ -50,14 +50,26 @@ def test_entity_file() -> Path:
     return TEST_DIR / "test.amlg"
 
 
+def _skip_or_fail_without_c_extension(config: pytest.Config) -> None:
+    """Skip the current test when the C extension is missing, or fail it when the extension is required."""
+    if not c_extension_available():
+        if config.getoption("require_c_extension") or selected_backend() == "c":
+            pytest.fail("the amalgam._api C extension is required but cannot be imported")
+        pytest.skip("the amalgam._api C extension is not built")
+
+
 @pytest.fixture(params=["c", "ctypes"])
 def backend(request: pytest.FixtureRequest) -> str:
     """Name of the native backend under test; a missing C extension skips its case unless it is required."""
-    if request.param == "c" and not c_extension_available():
-        if request.config.getoption("require_c_extension") or selected_backend() == "c":
-            pytest.fail("the amalgam._api C extension is required but cannot be imported")
-        pytest.skip("the amalgam._api C extension is not built")
+    if request.param == "c":
+        _skip_or_fail_without_c_extension(request.config)
     return request.param
+
+
+@pytest.fixture
+def c_extension(request: pytest.FixtureRequest) -> None:
+    """Require the C extension: skip without it, or fail when the extension is required."""
+    _skip_or_fail_without_c_extension(request.config)
 
 
 @pytest.fixture

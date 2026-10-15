@@ -51,6 +51,18 @@ repository = "https://github.com/howsoai/amalgam-lang-py"
 [tool.setuptools]
 packages = ["amalgam"]
 
+[[tool.setuptools.ext-modules]]
+name = "amalgam._api"
+sources = ["amalgam/_api.c"]
+py-limited-api = true
+optional = true
+
+[tool.setuptools.package-data]
+amalgam = ["_api.pyi"]
+
+[tool.setuptools.exclude-package-data]
+amalgam = ["*.c"]
+
 [tool.pytest.ini_options]
 testpaths = ["amalgam/test"]
 
