@@ -116,36 +116,6 @@ class CtypesLibrary:
             raise AttributeError(f"function '{name}' not found in the Amalgam library")
         return function
 
-    def str_to_char_p(
-        self,
-        value: str | bytes,
-        size: t.Optional[int] = None
-    ) -> Array[c_char]:
-        """
-        Convert a string to an Array of C char.
-
-        User must call `del` on returned buffer
-
-        Parameters
-        ----------
-        value : str or bytes
-            The value of the string.
-        size : int, optional
-            The size of the string. If not provided, the length of
-            the string is used.
-
-        Returns
-        -------
-        Array of c_char
-            An Array of C char datatypes which form the given string
-        """
-        if isinstance(value, str):
-            value = value.encode('utf-8')
-        buftype = c_char * (size if size is not None else (len(value) + 1))
-        buf = buftype()
-        buf.value = value
-        return buf
-
     def char_p_to_bytes(self, p: _Pointer[c_char] | c_char_p) -> bytes | None:
         """
         Copy native C char pointer to bytes, cleaning up memory correctly.

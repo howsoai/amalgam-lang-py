@@ -217,3 +217,16 @@ def test_load_entity_failure_status(amlg: Amalgam, tmp_path: Path) -> None:
     assert status.loaded is False
     assert status.message
     assert status.entity_path == []
+
+
+def test_load_entity_status_str() -> None:
+    """LoadEntityStatus renders as in trace files."""
+    status = LoadEntityStatus(loaded=False, message="bad", version="1.2.3", entity_path=["a", "b"])
+    assert str(status) == 'False,"bad","1.2.3",["a","b"]'
+    assert str(LoadEntityStatus()) == 'True,"",""'
+
+
+@pytest.mark.parametrize("name", ["str_to_char_p", "char_p_to_bytes", "char_p_to_str"])
+def test_marshalling_helpers_are_not_public(name: str) -> None:
+    """Amalgam exposes no ctypes-marshalling helpers."""
+    assert not hasattr(Amalgam, name)

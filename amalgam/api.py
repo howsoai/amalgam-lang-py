@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from base64 import b64encode
-from ctypes import _Pointer, Array, c_char, c_char_p
 from datetime import datetime
 import gc
 import json as json_lib
@@ -13,8 +12,8 @@ import threading
 import typing as t
 import warnings
 
-from amalgam._ctypes_library import _ResultWithLog
 from amalgam._native import load_native_library
+from amalgam._types import LoadStatusTuple
 
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
@@ -22,30 +21,38 @@ _logger = logging.getLogger('amalgam')
 
 class LoadEntityStatus:
     """
-    Status returned by :func:`~api.Amalgam.load_entity`.
+    Status returned by :func:`~api.Amalgam.load_entity` and related methods.
 
     Parameters
     ----------
-    api : Amalgam
-        The Python Amalgam interface.
-    status : tuple, optional
-        ``(loaded, message, version, entity_path)`` from the native backend.
+    loaded : bool, default True
+        Whether the entity loaded.
+    message : str or None, default ""
+        The engine's message, typically an error description.
+    version : str or None, default ""
+        The Amalgam version recorded in the loaded content.
+    entity_path : list of str or None, optional
+        The path of the contained entity the content was loaded into.
     """
 
-    def __init__(  # pyright: ignore[reportMissingSuperCall]
+    def __init__(
         self,
-        api: Amalgam,
-        status: tuple[bool, str | None, str | None, list[str | None]] | None = None
-    ):
-        """Initialize LoadEntityStatus."""
-        if status is None:
-            self.loaded = True
-            self.message = ""
-            self.version = ""
-            self.entity_path = []
-        else:
-            self.loaded, self.message, self.version, self.entity_path = status
+        *,
+        loaded: bool = True,
+        message: str | None = "",
+        version: str | None = "",
+        entity_path: list[str | None] | None = None,
+    ) -> None:
+        self.loaded = loaded
+        self.message = message
+        self.version = version
+        self.entity_path = entity_path if entity_path is not None else []
 
+    @classmethod
+    def _from_native(cls, status: LoadStatusTuple) -> LoadEntityStatus:
+        """Build a status from a native backend's ``(loaded, message, version, entity_path)`` tuple."""
+        loaded, message, version, entity_path = status
+        return cls(loaded=loaded, message=message, version=version, entity_path=entity_path)
 
     def __str__(self) -> str:
         """
@@ -81,29 +88,6 @@ class ResultWithLog:
 
         self.log = log
         """The Amalgam-syntax transaction-log entry."""
-
-    @classmethod
-    def from_c_result(cls, api: Amalgam, c_result: _ResultWithLog) -> t.Self:
-        """
-        Construct a `ResultWithLog` from the raw C result.
-
-        Frees the strings in the C result.
-
-        Parameters
-        ----------
-        api : Amalgam
-            The Amalgam API layer.
-        c_result: _ResultWithLog
-            The raw C result structure.
-
-        Returns
-        -------
-        ResultWithLog
-            A populated Python-side structure.
-        """
-        json = api.char_p_to_bytes(c_result.json)
-        log = api.char_p_to_bytes(c_result.log)
-        return cls(json=json, log=log)
 
 
 class Amalgam:
@@ -768,63 +752,6 @@ class Amalgam:
             self.op_count = 0
         self.op_count += 1
 
-    def str_to_char_p(
-        self,
-        value: str | bytes,
-        size: t.Optional[int] = None
-    ) -> Array[c_char]:
-        """
-        Convert a string to an Array of C char.
-
-        User must call `del` on returned buffer
-
-        Parameters
-        ----------
-        value : str or bytes
-            The value of the string.
-        size : int, optional
-            The size of the string. If not provided, the length of
-            the string is used.
-
-        Returns
-        -------
-        Array of c_char
-            An Array of C char datatypes which form the given string
-        """
-        return self.amlg.str_to_char_p(value, size)
-
-    def char_p_to_bytes(self, p: _Pointer[c_char] | c_char_p) -> bytes | None:
-        """
-        Copy native C char pointer to bytes, cleaning up memory correctly.
-
-        Parameters
-        ----------
-        p : c_char_p
-            The char pointer to convert
-
-        Returns
-        -------
-        bytes or None
-            The byte-encoded char
-        """
-        return self.amlg.char_p_to_bytes(p)
-
-    def char_p_to_str(self, p: _Pointer[c_char] | c_char_p) -> str | None:
-        """
-        Copy native C char pointer to UTF-8-encoded string, cleaning up memory correctly.
-
-        Parameters
-        ----------
-        p : c_char_p
-            The char pointer to convert
-
-        Returns
-        -------
-        str or None
-            The resulting string
-        """
-        return self.amlg.char_p_to_str(p)
-
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
         Get a label from amalgam and returns it in json format.
@@ -926,7 +853,7 @@ class Amalgam:
             f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
         ).encode()
         self._log_execution(self.load_command_log_entry)
-        result = LoadEntityStatus(self, self.amlg.load_entity(
+        result = LoadEntityStatus._from_native(self.amlg.load_entity(
             handle, file_path, file_type, persist, json_file_params, write_log, print_log, entity_path))
         self._log_reply(result)
 
@@ -984,7 +911,7 @@ class Amalgam:
             f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
         ).encode()
         self._log_execution(self.load_command_log_entry)
-        result = LoadEntityStatus(self, self.amlg.load_entity_from_memory(
+        result = LoadEntityStatus._from_native(self.amlg.load_entity_from_memory(
             handle, contents, file_type, json_file_params, write_log, print_log, entity_path))
         self._log_reply(result)
 
@@ -1010,7 +937,7 @@ class Amalgam:
             Status of VerifyEntity call.
         """
         self._log_execution_std(b"VERIFY_ENTITY", file_path)
-        result = LoadEntityStatus(self, self.amlg.verify_entity(file_path))
+        result = LoadEntityStatus._from_native(self.amlg.verify_entity(file_path))
         self._log_reply(result)
 
         self.gc()
