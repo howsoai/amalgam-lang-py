@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0.0", "wheel~=0.40.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77.0.3", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,12 +13,12 @@ authors = [
 ]
 requires-python = ">=3.11"
 keywords = ["machine", "learning", "artificial", "intelligence"]
-license = {file = "LICENSE.txt"}
+license = "AGPL-3.0-only"
+license-files = ["LICENSE.txt"]
 classifiers = [
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",

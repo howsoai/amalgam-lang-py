@@ -17,7 +17,7 @@ __pycache__
 **/junit/**
 htmlcov/
 .tox/
-test
+/test/
 .coverage
 .coverage.*
 .cache
@@ -30,6 +30,9 @@ coverage.xml
 #Building
 build/
 dist/
+wheelhouse/
+amalgam/_api*.so
+amalgam/_api*.pyd
 
 # IDE/Localconfig
 .direnv

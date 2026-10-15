@@ -3,10 +3,10 @@ import logging
 import json
 from uuid import uuid4
 import os
+from pathlib import Path
 
 import pytest
 
-import amalgam
 from amalgam.api import Amalgam
 
 _logger = logging.getLogger(__name__)
@@ -60,8 +60,7 @@ def bulk_operations(amlg):
     avg_time = 0
     for n in range(rounds):
         handle = str(uuid4())
-        amlg.load_entity(handle, os.path.dirname(
-            amalgam.__file__) + "/test/test.amlg", write_log="", print_log="")
+        amlg.load_entity(handle, str(Path(__file__).parent / "test.amlg"), write_log="", print_log="")
 
         amlg.set_entity_permissions(handle, json.dumps(True))
         ent_permissions = json.loads(amlg.get_entity_permissions(handle))
