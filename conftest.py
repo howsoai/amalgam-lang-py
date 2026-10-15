@@ -1,6 +1,9 @@
 """Repository-wide pytest options."""
 import os
 
+# Importing amalgam binds the installed package before pytest's importlib mode imports test modules from the
+# checkout, so tests run against the installed package and its compiled extension.
+import amalgam  # noqa: F401  # imported only for its side effect on sys.modules
 import pytest
 
 

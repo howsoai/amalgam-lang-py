@@ -85,3 +85,24 @@ split_penalty_for_added_line_split = 300
 
 # version is managed by setuptools_scm
 [tool.setuptools_scm]
+
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *t-*"
+build-frontend = "build"
+# Tags the cp311 build as cp311-abi3; only cibuildwheel's (never free-threaded) builds apply it.
+config-settings = { "--build-option" = "--py-limited-api=cp311" }
+test-requires = ["pytest", "pytest-mock"]
+test-environment = { AMALGAM_PY_BACKEND = "c" }
+test-command = "python -c \"import amalgam._api\" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test"
+# The wheel bundles prebuilt Amalgam engine libraries that ship as built, and amalgam._api links only
+# against libc and libpython, so no repair tool runs.
+repair-wheel-command = ""
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.linux]
+environment-pass = ["SETUPTOOLS_SCM_PRETEND_VERSION"]
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }
