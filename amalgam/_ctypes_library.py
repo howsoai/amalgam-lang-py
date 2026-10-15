@@ -1,11 +1,14 @@
 """Amalgam native backend implemented with ctypes."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from ctypes import (
     _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
     cast, CDLL, POINTER, string_at, Structure
 )
 import typing as t
+
+from amalgam._types import LoadStatusTuple, Text
 
 
 class _LoadEntityStatus(Structure):
@@ -66,6 +69,24 @@ _SIGNATURES: tuple[tuple[str, t.Any, tuple[t.Any, ...]], ...] = (
     ("ExecuteEntityJsonPtrLogged", _ResultWithLog, (c_char_p, c_char_p, c_char_p)),
     ("EvalOnEntity", _CHAR_P, (c_char_p, c_char_p)),
 )
+
+
+def _encode(value: Text) -> bytes:
+    """Return ``value`` as UTF-8 bytes; ``bytes`` input is returned as-is, without copying."""
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    raise TypeError(f"expected str or bytes, not {type(value).__name__}")
+
+
+def _entity_path_array(entity_path: Sequence[Text] | None) -> tuple[Array[c_char_p] | None, int]:
+    """Build a ``const char **`` array for an entity path; ``None`` or empty gives a null pointer."""
+    if not entity_path:
+        return None, 0
+    encoded = [_encode(entry) for entry in entity_path]
+    # The array keeps references to the bytes objects it points into.
+    return (c_char_p * len(encoded))(*encoded), len(encoded)
 
 
 class CtypesLibrary:
@@ -170,7 +191,7 @@ class CtypesLibrary:
 
     def _load_status(
         self, c_status: _LoadEntityStatus
-    ) -> tuple[bool, str | None, str | None, list[str | None]]:
+    ) -> LoadStatusTuple:
         """Convert and free an engine ``LoadEntityStatus``."""
         loaded = bool(c_status.loaded)
         message = self.char_p_to_str(c_status.message)
@@ -183,7 +204,7 @@ class CtypesLibrary:
         """Call ``IsSBFDataStoreEnabled``."""
         return self._function("IsSBFDataStoreEnabled")()
 
-    def set_sbf_datastore_enabled(self, enabled: bool) -> None:
+    def set_sbf_datastore_enabled(self, enabled: bool, /) -> None:
         """Call ``SetSBFDataStoreEnabled``."""
         self._function("SetSBFDataStoreEnabled")(enabled)
 
@@ -191,7 +212,7 @@ class CtypesLibrary:
         """Call ``GetMaxNumThreads``."""
         return self._function("GetMaxNumThreads")()
 
-    def set_max_num_threads(self, max_num_threads: int) -> None:
+    def set_max_num_threads(self, max_num_threads: int, /) -> None:
         """Call ``SetMaxNumThreads``."""
         self._function("SetMaxNumThreads")(max_num_threads)
 
@@ -203,298 +224,118 @@ class CtypesLibrary:
         """Call ``GetGarbageCollectionParams``."""
         return self.char_p_to_bytes(self._function("GetGarbageCollectionParams")())
 
-    def set_garbage_collection_params(self, json_params: str | bytes) -> None:
+    def set_garbage_collection_params(self, json_params: Text, /) -> None:
         """Call ``SetGarbageCollectionParams``."""
-        params_buf = self.str_to_char_p(json_params)
-        self._function("SetGarbageCollectionParams")(params_buf)
-        del params_buf
+        self._function("SetGarbageCollectionParams")(_encode(json_params))
 
-    def get_json_from_label(self, handle: str | bytes, label: str | bytes) -> bytes | None:
+    def get_json_from_label(self, handle: Text, label: Text, /) -> bytes | None:
         """Call ``GetJSONPtrFromLabel``."""
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        result = self.char_p_to_bytes(self._function("GetJSONPtrFromLabel")(handle_buf, label_buf))
-        del handle_buf
-        del label_buf
-        return result
+        return self.char_p_to_bytes(self._function("GetJSONPtrFromLabel")(_encode(handle), _encode(label)))
 
-    def set_json_to_label(self, handle: str | bytes, label: str | bytes, json: str | bytes) -> None:
+    def set_json_to_label(self, handle: Text, label: Text, json: Text, /) -> None:
         """Call ``SetJSONToLabel``."""
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-        self._function("SetJSONToLabel")(handle_buf, label_buf, json_buf)
-        del handle_buf
-        del label_buf
-        del json_buf
+        self._function("SetJSONToLabel")(_encode(handle), _encode(label), _encode(json))
 
     def load_entity(
-        self, handle: str, file_path: str, file_type: str, persist: bool, json_file_params: str,
-        write_log: str, print_log: str, entity_path: list[str] | None
-    ) -> tuple[bool, str | None, str | None, list[str | None]]:
+        self, handle: Text, file_path: Text, file_type: Text, persist: bool, json_file_params: Text,
+        write_log: Text, print_log: Text, entity_path: Sequence[Text] | None, /
+    ) -> LoadStatusTuple:
         """Call ``LoadEntity``."""
-        handle_buf = self.str_to_char_p(handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
-
-        result = self._load_status(self._function("LoadEntity")(
-            handle_buf, file_path_buf, file_type_buf, persist,
-            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
-
-        del handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
-        return result
+        path_array, path_len = _entity_path_array(entity_path)
+        return self._load_status(self._function("LoadEntity")(
+            _encode(handle), _encode(file_path), _encode(file_type), persist, _encode(json_file_params),
+            _encode(write_log), _encode(print_log), path_array, path_len))
 
     def load_entity_from_memory(
-        self, handle: str, contents: bytes, file_type: str, json_file_params: str,
-        write_log: str, print_log: str, entity_path: list[str] | None
-    ) -> tuple[bool, str | None, str | None, list[str | None]]:
-        """Call ``LoadEntityFromMemory``."""
-        handle_buf = self.str_to_char_p(handle)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-        entity_path_p = None
-        entity_path_len = 0
+        self, handle: Text, contents: bytes, file_type: Text, json_file_params: Text,
+        write_log: Text, print_log: Text, entity_path: Sequence[Text] | None, /
+    ) -> LoadStatusTuple:
+        """Call ``LoadEntityFromMemory``; ``contents`` must be ``bytes``."""
+        if not isinstance(contents, bytes):
+            raise TypeError(f"contents must be bytes, not {type(contents).__name__}")
+        path_array, path_len = _entity_path_array(entity_path)
+        return self._load_status(self._function("LoadEntityFromMemory")(
+            _encode(handle), contents, len(contents), _encode(file_type), False, _encode(json_file_params),
+            _encode(write_log), _encode(print_log), path_array, path_len))
 
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
-
-        result = self._load_status(self._function("LoadEntityFromMemory")(
-            handle_buf, contents, len(contents), file_type_buf, False,
-            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
-
-        del handle_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
-        return result
-
-    def verify_entity(self, file_path: str) -> tuple[bool, str | None, str | None, list[str | None]]:
+    def verify_entity(self, file_path: Text, /) -> LoadStatusTuple:
         """Call ``VerifyEntity``."""
-        file_path_buf = self.str_to_char_p(file_path)
+        return self._load_status(self._function("VerifyEntity")(_encode(file_path)))
 
-        result = self._load_status(self._function("VerifyEntity")(file_path_buf))
-
-        del file_path_buf
-        return result
-
-    def get_entity_permissions(self, handle: str) -> bytes | None:
+    def get_entity_permissions(self, handle: Text, /) -> bytes | None:
         """Call ``GetEntityPermissions``."""
-        handle_buf = self.str_to_char_p(handle)
+        return self.char_p_to_bytes(self._function("GetEntityPermissions")(_encode(handle)))
 
-        result = self.char_p_to_bytes(self._function("GetEntityPermissions")(handle_buf))
-
-        del handle_buf
-        return result
-
-    def set_entity_permissions(self, handle: str, json_permissions: str | bytes) -> bool:
+    def set_entity_permissions(self, handle: Text, json_permissions: Text, /) -> bool:
         """Call ``SetEntityPermissions``."""
-        handle_buf = self.str_to_char_p(handle)
-        json_permissions_buf = self.str_to_char_p(json_permissions)
-
-        result = self._function("SetEntityPermissions")(handle_buf, json_permissions_buf)
-
-        del handle_buf
-        del json_permissions_buf
-        return result
+        return self._function("SetEntityPermissions")(_encode(handle), _encode(json_permissions))
 
     def clone_entity(
-        self, handle: str, clone_handle: str, file_path: str, file_type: str, persist: bool,
-        json_file_params: str, write_log: str, print_log: str
+        self, handle: Text, clone_handle: Text, file_path: Text, file_type: Text, persist: bool,
+        json_file_params: Text, write_log: Text, print_log: Text, /
     ) -> bool:
         """Call ``CloneEntity``."""
-        handle_buf = self.str_to_char_p(handle)
-        clone_handle_buf = self.str_to_char_p(clone_handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-
-        result = self._function("CloneEntity")(
-            handle_buf, clone_handle_buf, file_path_buf, file_type_buf, persist,
-            json_file_params_buf, write_log_buf, print_log_buf)
-
-        del handle_buf
-        del clone_handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
-        return result
+        return self._function("CloneEntity")(
+            _encode(handle), _encode(clone_handle), _encode(file_path), _encode(file_type), persist,
+            _encode(json_file_params), _encode(write_log), _encode(print_log))
 
     def store_entity(
-        self, handle: str, file_path: str, file_type: str, persist: bool, json_file_params: str,
-        entity_path: list[str] | None
+        self, handle: Text, file_path: Text, file_type: Text, persist: bool, json_file_params: Text,
+        entity_path: Sequence[Text] | None, /
     ) -> bool:
         """Call ``StoreEntity``."""
-        handle_buf = self.str_to_char_p(handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
-
-        result = self._function("StoreEntity")(
-            handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
-
-        del handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
-        return result
+        path_array, path_len = _entity_path_array(entity_path)
+        return self._function("StoreEntity")(
+            _encode(handle), _encode(file_path), _encode(file_type), persist, _encode(json_file_params),
+            path_array, path_len)
 
     def store_entity_to_memory(
-        self, handle: str, file_type: str, json_file_params: str, entity_path: list[str] | None
+        self, handle: Text, file_type: Text, json_file_params: Text, entity_path: Sequence[Text] | None, /
     ) -> bytes | None:
         """Call ``StoreEntityToMemory``."""
-        handle_buf = self.str_to_char_p(handle)
         data_p = c_void_p(None)
         data_len = c_size_t(0)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
+        path_array, path_len = _entity_path_array(entity_path)
 
         self._function("StoreEntityToMemory")(
-            handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf,
-            entity_path_p, entity_path_len)
+            _encode(handle), byref(data_p), byref(data_len), _encode(file_type), False,
+            _encode(json_file_params), path_array, path_len)
 
         result = None
         if data_p.value is not None:
             result = string_at(data_p.value, data_len.value)
             self._function("DeleteString")(cast(data_p, c_char_p))
-
-        del handle_buf
-        del file_type_buf
-        del json_file_params_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
         return result
 
-    def destroy_entity(self, handle: str) -> None:
+    def destroy_entity(self, handle: Text, /) -> None:
         """Call ``DestroyEntity``."""
-        handle_buf = self.str_to_char_p(handle)
+        self._function("DestroyEntity")(_encode(handle))
 
-        self._function("DestroyEntity")(handle_buf)
-
-        del handle_buf
-
-    def set_random_seed(self, handle: str, rand_seed: str) -> bool:
+    def set_random_seed(self, handle: Text, rand_seed: Text, /) -> bool:
         """Call ``SetRandomSeed``."""
-        handle_buf = self.str_to_char_p(handle)
-        rand_seed_buf = self.str_to_char_p(rand_seed)
-
-        result = self._function("SetRandomSeed")(handle_buf, rand_seed_buf)
-
-        del handle_buf
-        del rand_seed_buf
-        return result
+        return self._function("SetRandomSeed")(_encode(handle), _encode(rand_seed))
 
     def get_entities(self) -> list[str]:
         """Call ``GetEntities``."""
         num_entities = c_uint64()
         entities = self._function("GetEntities")(byref(num_entities))
-        result = [entities[i].decode() for i in range(num_entities.value)]
+        return [entities[i].decode() for i in range(num_entities.value)]
 
-        del entities
-        del num_entities
-        return result
-
-    def execute_entity_json(self, handle: str, label: str, json: str | bytes) -> bytes | None:
+    def execute_entity_json(self, handle: Text, label: Text, json: Text, /) -> bytes | None:
         """Call ``ExecuteEntityJsonPtr``."""
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-
-        result = self.char_p_to_bytes(self._function("ExecuteEntityJsonPtr")(
-            handle_buf, label_buf, json_buf))
-
-        del handle_buf
-        del label_buf
-        del json_buf
-        return result
+        return self.char_p_to_bytes(
+            self._function("ExecuteEntityJsonPtr")(_encode(handle), _encode(label), _encode(json)))
 
     def execute_entity_json_logged(
-        self, handle: str, label: str, json: str | bytes
+        self, handle: Text, label: Text, json: Text, /
     ) -> tuple[bytes | None, bytes | None]:
         """Call ``ExecuteEntityJsonPtrLogged``."""
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
+        c_result = self._function("ExecuteEntityJsonPtrLogged")(_encode(handle), _encode(label), _encode(json))
+        return self.char_p_to_bytes(c_result.json), self.char_p_to_bytes(c_result.log)
 
-        c_result = self._function("ExecuteEntityJsonPtrLogged")(
-            handle_buf, label_buf, json_buf)
-        result = self.char_p_to_bytes(c_result.json), self.char_p_to_bytes(c_result.log)
-
-        del handle_buf
-        del label_buf
-        del json_buf
-        return result
-
-    def eval_on_entity(self, handle: str, amlg: str | bytes) -> bytes | None:
+    def eval_on_entity(self, handle: Text, amlg: Text, /) -> bytes | None:
         """Call ``EvalOnEntity``."""
-        handle_buf = self.str_to_char_p(handle)
-        amlg_buf = self.str_to_char_p(amlg)
-
-        result = self.char_p_to_bytes(self._function("EvalOnEntity")(
-            handle_buf, amlg_buf))
-
-        del handle_buf
-        del amlg_buf
-        return result
+        return self.char_p_to_bytes(self._function("EvalOnEntity")(_encode(handle), _encode(amlg)))
 
     def get_version_string(self) -> bytes | None:
         """Call ``GetVersionString``."""

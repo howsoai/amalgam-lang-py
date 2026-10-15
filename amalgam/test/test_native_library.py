@@ -186,6 +186,24 @@ def test_rejects_non_text_arguments(native_library: NativeLibrary, entity: str, 
         native_library.execute_entity_json(entity, "echo", bad)  # type: ignore[arg-type]
 
 
+def test_arguments_are_positional_only(native_library: NativeLibrary, entity: str) -> None:
+    """Every backend rejects keyword arguments."""
+    # The keyword calls are the behavior under test, so they are deliberately ill-typed.
+    with pytest.raises(TypeError):
+        native_library.get_json_from_label(handle=entity, label="hello_howso")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        native_library.eval_on_entity(entity, amlg="(+ 1 2)")  # type: ignore[call-arg]
+
+
+def test_load_entity_from_memory_rejects_str_contents(
+    native_library: NativeLibrary, new_native_handle: Callable[[], str]
+) -> None:
+    """Serialized contents must be bytes; a str raises TypeError."""
+    with pytest.raises(TypeError):
+        native_library.load_entity_from_memory(
+            new_native_handle(), "(null)", "amlg", "", "", "", None)  # type: ignore[arg-type]
+
+
 def test_engine_calls_release_the_gil(native_library: NativeLibrary, entity: str) -> None:
     """Python threads keep running while an engine call is in progress."""
     done = threading.Event()

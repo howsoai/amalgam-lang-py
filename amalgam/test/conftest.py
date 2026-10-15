@@ -2,6 +2,7 @@
 from collections.abc import Callable, Iterator
 import os
 from pathlib import Path
+import tracemalloc
 from uuid import uuid4
 
 import pytest
@@ -11,6 +12,25 @@ from amalgam._types import NativeLibrary
 from amalgam.api import Amalgam
 
 TEST_DIR = Path(__file__).parent
+
+
+def _peak_traced_bytes(function: Callable[[], object]) -> int:
+    """Run ``function`` and return its peak Python-heap growth in bytes."""
+    tracemalloc.start()
+    try:
+        tracemalloc.reset_peak()
+        baseline, _ = tracemalloc.get_traced_memory()
+        function()
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    return peak - baseline
+
+
+@pytest.fixture
+def peak_traced_bytes() -> Callable[[Callable[[], object]], int]:
+    """Measure the peak Python-heap growth of a callable."""
+    return _peak_traced_bytes
 
 
 @pytest.fixture(scope="session")
