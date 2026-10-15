@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from ctypes import (
     _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure, string_at
+    cast, CDLL, POINTER, string_at, Structure
 )
 import typing as t
 
@@ -38,12 +38,12 @@ class CtypesLibrary:
 
     Parameters
     ----------
-    library_path : str
-        Path of the Amalgam shared library.
+    cdll : CDLL
+        The loaded Amalgam library, from :func:`amalgam._loader.open_library`.
     """
 
-    def __init__(self, library_path: str) -> None:
-        self.amlg = cdll.LoadLibrary(library_path)
+    def __init__(self, cdll: CDLL) -> None:
+        self.amlg = cdll
 
     def str_to_char_p(
         self,

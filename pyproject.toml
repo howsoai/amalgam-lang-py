@@ -51,6 +51,9 @@ repository = "https://github.com/howsoai/amalgam-lang-py"
 [tool.setuptools]
 packages = ["amalgam"]
 
+[tool.pytest.ini_options]
+testpaths = ["amalgam/test"]
+
 [tool.isort]
 profile = "google"
 known_first_party = ["howso"]

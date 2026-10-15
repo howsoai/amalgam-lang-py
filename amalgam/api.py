@@ -13,7 +13,8 @@ import threading
 import typing as t
 import warnings
 
-from amalgam._ctypes_library import _ResultWithLog, CtypesLibrary
+from amalgam._ctypes_library import _ResultWithLog
+from amalgam._native import load_native_library
 
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
@@ -109,7 +110,8 @@ class Amalgam:
     """
     A general python direct interface to the Amalgam library.
 
-    This is implemented with ctypes for accessing binary Amalgam builds.
+    Native calls go through the ``amalgam._api`` C extension when it is available and through ctypes
+    otherwise; set the ``AMALGAM_PY_BACKEND`` environment variable to ``c`` or ``ctypes`` to choose one.
 
     Parameters
     ----------
@@ -245,7 +247,8 @@ class Amalgam:
 
         _logger.debug(f"Loading amalgam library: {self.library_path}")
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
-        self.amlg = CtypesLibrary(str(self.library_path))
+        self.amlg = load_native_library(self.library_path)
+        _logger.debug(f"Amalgam backend: {type(self.amlg).__module__}")
         if sbf_datastore_enabled is not None:
             self.set_amlg_flags(sbf_datastore_enabled)
         if max_num_threads is not None:

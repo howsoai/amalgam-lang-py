@@ -2,46 +2,41 @@ import datetime as dt
 import logging
 import json
 from uuid import uuid4
-import os
 from pathlib import Path
 
 import pytest
 
+from amalgam._native import BACKEND_ENV_VAR
 from amalgam.api import Amalgam
 
 _logger = logging.getLogger(__name__)
 
-amlg_postfix = os.getenv('AMALGAM_LIBRARY_POSTFIX', '-st')
-amlg_path, _ = Amalgam._get_library_path(library_postfix=amlg_postfix)
-_logger.debug('Amalgam path: %s', amlg_path)
-is_amalgam_installed = amlg_path.exists()
-
 
 @pytest.fixture
-def amalgam_lib():
-    return Amalgam(library_path=amlg_path, gc_interval=1000,
-                   execution_trace_dir='./traces/', trace=True)
+def amalgam_lib(
+    amalgam_library_path: Path, backend: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Amalgam:
+    """A traced Amalgam instance on the backend under test."""
+    monkeypatch.setenv(BACKEND_ENV_VAR, backend)
+    return Amalgam(library_path=amalgam_library_path, gc_interval=1000,
+                   execution_trace_dir=str(tmp_path / "traces"), trace=True)
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam is not installed")
 def test_bulk_operations(amalgam_lib):
     amalgam_lib.reset_trace('test_bulk_operations.trace')
     assert bulk_operations(amalgam_lib)
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
 def test_get_version(amalgam_lib):
     amalgam_lib.reset_trace('test_get_version.trace')
     assert amalgam_lib.get_version_string()
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
 def test_get_concurrency_type(amalgam_lib):
     amalgam_lib.reset_trace('test_get_version.trace')
     assert amalgam_lib.get_concurrency_type_string()
 
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
 def test_is_sbf_datastore_enabled(amalgam_lib):
     assert amalgam_lib.is_sbf_datastore_enabled()
 
@@ -92,7 +87,6 @@ def bulk_operations(amlg):
     _logger.info(str(avg_ops / rounds) + " operations per second")
     return True
 
-@pytest.mark.skipif(not is_amalgam_installed, reason="Amalgam not installed")
 def test_runtime_performance_control(amalgam_lib):
     active_threads = amalgam_lib.get_num_active_threads()
     assert isinstance(active_threads, int)
