@@ -49,9 +49,11 @@ amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 ```
 
 ## Testing
-There is a `Pytest` unit test suite located in `amalgam/test`. The tests in `test_standalone.py` will only execute if an `Amalgam` binary is located in the default expected path of `amalgam/lib/{os}/{architecture}`.
+There is a `Pytest` unit test suite located in `amalgam/test`. Most tests load the Amalgam library from `amalgam/lib/{os}/{architecture}` and are skipped when it is not there; link or copy the libraries from a local [Amalgam](https://github.com/howsoai/amalgam) build into that directory, or download a release matching `version.json` and copy its `lib/` files there.
 
-To specify whether `test_standalone.py` should use single-threaded or multi-threaded `Amalgam` (assuming the appropriate binary is in the above path), set the `AMALGAM_LIBRARY_POSTFIX` environment variable to the desired postfix, e.g., `-st` or `-mt`.
+To specify whether the tests should use single-threaded or multi-threaded `Amalgam`, set the `AMALGAM_LIBRARY_POSTFIX` environment variable to the desired postfix, e.g., `-st` or `-mt`.
+
+Tests that call the library run once per native backend. The C extension backend is skipped when the extension is not built; pass `--require-c-extension` (on by default when the `CI` environment variable is set to a truthy value, meaning anything other than empty, `0`, `false`, `no`, or `off`, ignoring case and surrounding whitespace) to make a missing extension a test failure instead.
 
 ## License
 

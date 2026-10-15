@@ -903,14 +903,16 @@ class Amalgam:
         LoadEntityStatus
             Status of LoadEntity call.
         """
-        self.load_command_log_entry = (
-            f"LOAD_ENTITY_FROM_MEMORY \"{self.escape_double_quotes(handle)}\" "
-            f"\"{b64encode(contents).decode()}\" "
-            f"\"{self.escape_double_quotes(file_type)}\" false "
-            f"{json_lib.dumps(json_file_params)} "
-            f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
-        ).encode()
-        self._log_execution(self.load_command_log_entry)
+        self.load_command_log_entry = None
+        if self._trace:
+            self.load_command_log_entry = (
+                f"LOAD_ENTITY_FROM_MEMORY \"{self.escape_double_quotes(handle)}\" "
+                f"\"{b64encode(contents).decode()}\" "
+                f"\"{self.escape_double_quotes(file_type)}\" false "
+                f"{json_lib.dumps(json_file_params)} "
+                f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
+            ).encode()
+            self._log_execution(self.load_command_log_entry)
         result = LoadEntityStatus._from_native(self.amlg.load_entity_from_memory(
             handle, contents, file_type, json_file_params, write_log, print_log, entity_path))
         self._log_reply(result)
@@ -1132,15 +1134,14 @@ class Amalgam:
         Returns
         -------
         bytes | None
-            The serialized entity contents, or None on an error.
+            The serialized entity contents. They are empty when no entity has the
+            handle ``handle``, and None if the engine returns no buffer.
         """
         self._log_execution_std(b"STORE_ENTITY_TO_MEMORY", handle, file_type,
                                 suffix=f"false {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
         result = self.amlg.store_entity_to_memory(handle, file_type, json_file_params, entity_path)
-        if result is not None:
-            self._log_reply(b64encode(result).decode())
-        else:
-            self._log_reply(None)
+        if self._trace:
+            self._log_reply(b64encode(result).decode() if result is not None else None)
 
         self.gc()
         return result
