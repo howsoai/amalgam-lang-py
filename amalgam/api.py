@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from ctypes import (
-    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
+    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_long, c_size_t, c_uint64, c_void_p,
     cast, cdll, POINTER, Structure, string_at
 )
 from datetime import datetime
@@ -15,6 +15,7 @@ import re
 import threading
 import typing as t
 import warnings
+from . import _api
 
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
@@ -1545,23 +1546,11 @@ class Amalgam:
         bytes
             A byte-encoded json representation of the response.
         """
-        self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
-        self.amlg.ExecuteEntityJsonPtr.argtypes = [
-            c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
-        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
-            handle_buf, label_buf, json_buf))
+        result = _api.execute_entity_json(self.amlg._handle, handle, label, json)
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
-
-        del handle_buf
-        del label_buf
-        del json_buf
 
         return result
 

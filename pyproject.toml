@@ -13,12 +13,12 @@ authors = [
 ]
 requires-python = ">=3.11"
 keywords = ["machine", "learning", "artificial", "intelligence"]
-license = {file = "LICENSE.txt"}
+license = "AGPL-3.0-only"
+license-files = ["LICENSE.txt"]
 classifiers = [
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -51,6 +51,10 @@ repository = "https://github.com/howsoai/amalgam-lang-py"
 [tool.setuptools]
 packages = ["amalgam"]
 
+[[tool.setuptools.ext-modules]]
+name = "amalgam._api"
+sources = ["amalgam/_api.c"]
+
 [tool.isort]
 profile = "google"
 known_first_party = ["howso"]
@@ -70,3 +74,6 @@ split_penalty_for_added_line_split = 300
 
 # version is managed by setuptools_scm
 [tool.setuptools_scm]
+
+[tool.hatch.envs.default]
+features = ["dev"]
