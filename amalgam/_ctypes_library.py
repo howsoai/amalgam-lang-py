@@ -213,7 +213,9 @@ class CtypesLibrary:
         return self._function("GetMaxNumThreads")()
 
     def set_max_num_threads(self, max_num_threads: int, /) -> None:
-        """Call ``SetMaxNumThreads``."""
+        """Call ``SetMaxNumThreads``; a negative count raises ValueError."""
+        if max_num_threads < 0:
+            raise ValueError("max_num_threads must not be negative")
         self._function("SetMaxNumThreads")(max_num_threads)
 
     def get_num_active_threads(self) -> int:

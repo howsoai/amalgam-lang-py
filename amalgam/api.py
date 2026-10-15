@@ -507,7 +507,14 @@ class Amalgam:
             If a multithreaded Amalgam binary is used, sets the maximum number
             of threads to the value specified. If 0, will use the number of
             visible logical cores.
+
+        Raises
+        ------
+        ValueError
+            If ``max_num_threads`` is negative. Nothing is written to the trace.
         """
+        if max_num_threads < 0:
+            raise ValueError("max_num_threads must not be negative")
         self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}".encode())
         self.amlg.set_max_num_threads(max_num_threads)
         self._log_reply(None)

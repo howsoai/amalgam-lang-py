@@ -180,6 +180,16 @@ def test_logging_logged(amlg: Amalgam, loaded_entity: str) -> None:
     assert trace_lines[5:] == [b""]
 
 
+def test_set_max_num_threads_rejects_negative_untraced(amlg: Amalgam) -> None:
+    """A negative thread count raises ValueError before anything is written to the trace."""
+    trace = BytesIO()
+    amlg.trace = trace
+    with pytest.raises(ValueError):
+        amlg.set_max_num_threads(-1)
+    amlg.trace = None
+    assert trace.getvalue() == b""
+
+
 def test_public_api(
     amlg: Amalgam, loaded_entity: str, new_handle: Callable[[], str], tmp_path: Path
 ) -> None:

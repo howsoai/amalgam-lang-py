@@ -266,3 +266,11 @@ def test_store_from_entity_path(
         entity, contents, "amlg", "", "", "", ("second",))
     assert loaded, message
     assert entity_path == ["second"]
+
+
+def test_set_max_num_threads_rejects_negative(native_library: NativeLibrary) -> None:
+    """A negative thread count raises ValueError and leaves the setting unchanged."""
+    maximum = native_library.get_max_num_threads()
+    with pytest.raises(ValueError):
+        native_library.set_max_num_threads(-1)
+    assert native_library.get_max_num_threads() == maximum
