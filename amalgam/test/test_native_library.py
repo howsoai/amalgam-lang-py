@@ -222,3 +222,29 @@ def test_ctypes_missing_entry_point_fails_when_called() -> None:
     library = CtypesLibrary(CDLL(other_library))
     with pytest.raises(AttributeError, match="GetVersionString"):
         library.get_version_string()
+
+
+def test_store_from_entity_path(
+    native_library: NativeLibrary, entity: str, test_entity_file: Path, new_native_handle: Callable[[], str],
+    tmp_path: Path
+) -> None:
+    """A contained entity can be stored to memory and to a file by its entity path."""
+    loaded, message, _, _ = native_library.load_entity(
+        entity, str(test_entity_file), "", False, "", "", "", ["child"])
+    assert loaded, message
+    target = tmp_path / "child.amlg"
+    assert native_library.store_entity(entity, str(target), "", False, "", ["child"]) is True
+    loaded, message, _, _ = native_library.verify_entity(str(target))
+    assert loaded, message
+    # Storing the containing entity would also write its contained entities into this directory.
+    assert not (tmp_path / "child").exists()
+    stored = new_native_handle()
+    loaded, message, _, _ = native_library.load_entity(stored, str(target), "", False, "", "", "", None)
+    assert loaded, message
+    assert native_library.get_json_from_label(stored, "hello_howso") == b'"Hello Howso!"'
+    contents = native_library.store_entity_to_memory(entity, "amlg", "", ["child"])
+    assert contents and b"hello_howso" in contents
+    loaded, message, _, entity_path = native_library.load_entity_from_memory(
+        entity, contents, "amlg", "", "", "", ("second",))
+    assert loaded, message
+    assert entity_path == ["second"]

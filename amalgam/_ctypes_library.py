@@ -371,7 +371,7 @@ class CtypesLibrary:
             entity_path_len = len(entity_path)
             entity_path_p = (c_char_p * entity_path_len)()
             for i, entry in enumerate(entity_path):
-                entity_path_p[i] = self.str_to_char_p(entry)
+                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
 
         result = self._function("StoreEntity")(
             handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
@@ -403,7 +403,7 @@ class CtypesLibrary:
             entity_path_len = len(entity_path)
             entity_path_p = (c_char_p * entity_path_len)()
             for i, entry in enumerate(entity_path):
-                entity_path_p[i] = self.str_to_char_p(entry)
+                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
 
         self._function("StoreEntityToMemory")(
             handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf,
