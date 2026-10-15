@@ -32,6 +32,42 @@ class _ResultWithLog(Structure):
     ]
 
 
+_CHAR_P = POINTER(c_char)
+
+# (entry point, restype, argtypes) for every engine function this backend calls.
+_SIGNATURES: tuple[tuple[str, t.Any, tuple[t.Any, ...]], ...] = (
+    ("DeleteString", None, (c_char_p,)),
+    ("GetVersionString", _CHAR_P, ()),
+    ("GetConcurrencyTypeString", _CHAR_P, ()),
+    ("IsSBFDataStoreEnabled", c_bool, ()),
+    ("SetSBFDataStoreEnabled", None, (c_bool,)),
+    ("GetMaxNumThreads", c_size_t, ()),
+    ("SetMaxNumThreads", None, (c_size_t,)),
+    ("GetNumActiveThreads", c_size_t, ()),
+    ("GetGarbageCollectionParams", _CHAR_P, ()),
+    ("SetGarbageCollectionParams", None, (c_char_p,)),
+    ("GetJSONPtrFromLabel", _CHAR_P, (c_char_p, c_char_p)),
+    ("SetJSONToLabel", None, (c_char_p, c_char_p, c_char_p)),
+    ("GetEntityPermissions", _CHAR_P, (c_char_p,)),
+    ("SetEntityPermissions", c_bool, (c_char_p, c_char_p)),
+    ("LoadEntity", _LoadEntityStatus,
+     (c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p), c_size_t)),
+    ("LoadEntityFromMemory", _LoadEntityStatus,
+     (c_char_p, c_void_p, c_size_t, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p), c_size_t)),
+    ("VerifyEntity", _LoadEntityStatus, (c_char_p,)),
+    ("CloneEntity", c_bool, (c_char_p, c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p)),
+    ("StoreEntity", c_bool, (c_char_p, c_char_p, c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t)),
+    ("StoreEntityToMemory", c_bool,
+     (c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t)),
+    ("DestroyEntity", None, (c_char_p,)),
+    ("SetRandomSeed", c_bool, (c_char_p, c_char_p)),
+    ("GetEntities", POINTER(c_char_p), (POINTER(c_uint64),)),
+    ("ExecuteEntityJsonPtr", _CHAR_P, (c_char_p, c_char_p, c_char_p)),
+    ("ExecuteEntityJsonPtrLogged", _ResultWithLog, (c_char_p, c_char_p, c_char_p)),
+    ("EvalOnEntity", _CHAR_P, (c_char_p, c_char_p)),
+)
+
+
 class CtypesLibrary:
     """
     Amalgam native backend that calls the engine through ctypes.
@@ -43,7 +79,21 @@ class CtypesLibrary:
     """
 
     def __init__(self, cdll: CDLL) -> None:
-        self.amlg = cdll
+        self._cdll = cdll
+        self._functions: dict[str, t.Any] = {}
+        for name, restype, argtypes in _SIGNATURES:
+            function = getattr(cdll, name, None)
+            if function is not None:
+                function.restype = restype
+                function.argtypes = list(argtypes)
+            self._functions[name] = function
+
+    def _function(self, name: str) -> t.Any:
+        """Return the configured engine function ``name``."""
+        function = self._functions[name]
+        if function is None:
+            raise AttributeError(f"function '{name}' not found in the Amalgam library")
+        return function
 
     def str_to_char_p(
         self,
@@ -91,9 +141,7 @@ class CtypesLibrary:
         """
         bytes_str = cast(p, c_char_p).value
 
-        self.amlg.DeleteString.argtypes = [c_char_p]
-        self.amlg.DeleteString.restype = None
-        self.amlg.DeleteString(p)
+        self._function("DeleteString")(p)
 
         return bytes_str
 
@@ -128,70 +176,54 @@ class CtypesLibrary:
         message = self.char_p_to_str(c_status.message)
         version = self.char_p_to_str(c_status.version)
         entity_path = [self.char_p_to_str(c_status.entity_path[i]) for i in range(c_status.entity_path_len)]
-        self.amlg.DeleteString(cast(c_status.entity_path, c_char_p))
+        self._function("DeleteString")(cast(c_status.entity_path, c_char_p))
         return loaded, message, version, entity_path
 
     def is_sbf_datastore_enabled(self) -> bool:
         """Call ``IsSBFDataStoreEnabled``."""
-        self.amlg.IsSBFDataStoreEnabled.restype = c_bool
-        return self.amlg.IsSBFDataStoreEnabled()
+        return self._function("IsSBFDataStoreEnabled")()
 
     def set_sbf_datastore_enabled(self, enabled: bool) -> None:
         """Call ``SetSBFDataStoreEnabled``."""
-        self.amlg.SetSBFDataStoreEnabled.argtypes = [c_bool]
-        self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
-        self.amlg.SetSBFDataStoreEnabled(enabled)
+        self._function("SetSBFDataStoreEnabled")(enabled)
 
     def get_max_num_threads(self) -> int:
         """Call ``GetMaxNumThreads``."""
-        self.amlg.GetMaxNumThreads.restype = c_size_t
-        return self.amlg.GetMaxNumThreads()
+        return self._function("GetMaxNumThreads")()
 
     def set_max_num_threads(self, max_num_threads: int) -> None:
         """Call ``SetMaxNumThreads``."""
-        self.amlg.SetMaxNumThreads.argtypes = [c_size_t]
-        self.amlg.SetMaxNumThreads.restype = c_void_p
-        self.amlg.SetMaxNumThreads(max_num_threads)
+        self._function("SetMaxNumThreads")(max_num_threads)
 
     def get_num_active_threads(self) -> int:
         """Call ``GetNumActiveThreads``."""
-        self.amlg.GetNumActiveThreads.argtypes = []
-        self.amlg.GetNumActiveThreads.restype = c_size_t
-        return self.amlg.GetNumActiveThreads()
+        return self._function("GetNumActiveThreads")()
 
     def get_garbage_collection_params(self) -> bytes | None:
         """Call ``GetGarbageCollectionParams``."""
-        self.amlg.GetGarbageCollectionParams.argtypes = []
-        self.amlg.GetGarbageCollectionParams.restype = POINTER(c_char)
-        return self.char_p_to_bytes(self.amlg.GetGarbageCollectionParams())
+        return self.char_p_to_bytes(self._function("GetGarbageCollectionParams")())
 
     def set_garbage_collection_params(self, json_params: str | bytes) -> None:
         """Call ``SetGarbageCollectionParams``."""
-        self.amlg.SetGarbageCollectionParams.argtypes = [c_char_p]
-        self.amlg.SetGarbageCollectionParams.restype = None
         params_buf = self.str_to_char_p(json_params)
-        self.amlg.SetGarbageCollectionParams(params_buf)
+        self._function("SetGarbageCollectionParams")(params_buf)
         del params_buf
 
     def get_json_from_label(self, handle: str | bytes, label: str | bytes) -> bytes | None:
         """Call ``GetJSONPtrFromLabel``."""
-        self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
-        self.amlg.GetJSONPtrFromLabel.argtypes = [c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
-        result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
+        result = self.char_p_to_bytes(self._function("GetJSONPtrFromLabel")(handle_buf, label_buf))
         del handle_buf
         del label_buf
         return result
 
     def set_json_to_label(self, handle: str | bytes, label: str | bytes, json: str | bytes) -> None:
         """Call ``SetJSONToLabel``."""
-        self.amlg.SetJSONToLabel.restype = c_void_p
-        self.amlg.SetJSONToLabel.argtypes = [c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
-        self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
+        self._function("SetJSONToLabel")(handle_buf, label_buf, json_buf)
         del handle_buf
         del label_buf
         del json_buf
@@ -201,10 +233,6 @@ class CtypesLibrary:
         write_log: str, print_log: str, entity_path: list[str] | None
     ) -> tuple[bool, str | None, str | None, list[str | None]]:
         """Call ``LoadEntity``."""
-        self.amlg.LoadEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
-            c_size_t]
-        self.amlg.LoadEntity.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         file_path_buf = self.str_to_char_p(file_path)
         file_type_buf = self.str_to_char_p(file_type)
@@ -220,7 +248,7 @@ class CtypesLibrary:
             for i, entry in enumerate(entity_path):
                 entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
 
-        result = self._load_status(self.amlg.LoadEntity(
+        result = self._load_status(self._function("LoadEntity")(
             handle_buf, file_path_buf, file_type_buf, persist,
             json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
 
@@ -242,10 +270,6 @@ class CtypesLibrary:
         write_log: str, print_log: str, entity_path: list[str] | None
     ) -> tuple[bool, str | None, str | None, list[str | None]]:
         """Call ``LoadEntityFromMemory``."""
-        self.amlg.LoadEntityFromMemory.argtypes = [
-            c_char_p, c_void_p, c_size_t, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
-            c_size_t]
-        self.amlg.LoadEntityFromMemory.restype = _LoadEntityStatus
         handle_buf = self.str_to_char_p(handle)
         file_type_buf = self.str_to_char_p(file_type)
         json_file_params_buf = self.str_to_char_p(json_file_params)
@@ -260,7 +284,7 @@ class CtypesLibrary:
             for i, entry in enumerate(entity_path):
                 entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
 
-        result = self._load_status(self.amlg.LoadEntityFromMemory(
+        result = self._load_status(self._function("LoadEntityFromMemory")(
             handle_buf, contents, len(contents), file_type_buf, False,
             json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
 
@@ -278,34 +302,28 @@ class CtypesLibrary:
 
     def verify_entity(self, file_path: str) -> tuple[bool, str | None, str | None, list[str | None]]:
         """Call ``VerifyEntity``."""
-        self.amlg.VerifyEntity.argtypes = [c_char_p]
-        self.amlg.VerifyEntity.restype = _LoadEntityStatus
         file_path_buf = self.str_to_char_p(file_path)
 
-        result = self._load_status(self.amlg.VerifyEntity(file_path_buf))
+        result = self._load_status(self._function("VerifyEntity")(file_path_buf))
 
         del file_path_buf
         return result
 
     def get_entity_permissions(self, handle: str) -> bytes | None:
         """Call ``GetEntityPermissions``."""
-        self.amlg.GetEntityPermissions.argtypes = [c_char_p]
-        self.amlg.GetEntityPermissions.restype = POINTER(c_char)
         handle_buf = self.str_to_char_p(handle)
 
-        result = self.char_p_to_bytes(self.amlg.GetEntityPermissions(handle_buf))
+        result = self.char_p_to_bytes(self._function("GetEntityPermissions")(handle_buf))
 
         del handle_buf
         return result
 
     def set_entity_permissions(self, handle: str, json_permissions: str | bytes) -> bool:
         """Call ``SetEntityPermissions``."""
-        self.amlg.SetEntityPermissions.argtypes = [c_char_p, c_char_p]
-        self.amlg.SetEntityPermissions.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         json_permissions_buf = self.str_to_char_p(json_permissions)
 
-        result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
+        result = self._function("SetEntityPermissions")(handle_buf, json_permissions_buf)
 
         del handle_buf
         del json_permissions_buf
@@ -316,8 +334,6 @@ class CtypesLibrary:
         json_file_params: str, write_log: str, print_log: str
     ) -> bool:
         """Call ``CloneEntity``."""
-        self.amlg.CloneEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         clone_handle_buf = self.str_to_char_p(clone_handle)
         file_path_buf = self.str_to_char_p(file_path)
@@ -326,7 +342,7 @@ class CtypesLibrary:
         write_log_buf = self.str_to_char_p(write_log)
         print_log_buf = self.str_to_char_p(print_log)
 
-        result = self.amlg.CloneEntity(
+        result = self._function("CloneEntity")(
             handle_buf, clone_handle_buf, file_path_buf, file_type_buf, persist,
             json_file_params_buf, write_log_buf, print_log_buf)
 
@@ -344,9 +360,6 @@ class CtypesLibrary:
         entity_path: list[str] | None
     ) -> bool:
         """Call ``StoreEntity``."""
-        self.amlg.StoreEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntity.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         file_path_buf = self.str_to_char_p(file_path)
         file_type_buf = self.str_to_char_p(file_type)
@@ -360,7 +373,7 @@ class CtypesLibrary:
             for i, entry in enumerate(entity_path):
                 entity_path_p[i] = self.str_to_char_p(entry)
 
-        result = self.amlg.StoreEntity(
+        result = self._function("StoreEntity")(
             handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
 
         del handle_buf
@@ -378,9 +391,6 @@ class CtypesLibrary:
         self, handle: str, file_type: str, json_file_params: str, entity_path: list[str] | None
     ) -> bytes | None:
         """Call ``StoreEntityToMemory``."""
-        self.amlg.StoreEntityToMemory.argtypes = [
-            c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntityToMemory.restype = c_bool
         handle_buf = self.str_to_char_p(handle)
         data_p = c_void_p(None)
         data_len = c_size_t(0)
@@ -395,15 +405,14 @@ class CtypesLibrary:
             for i, entry in enumerate(entity_path):
                 entity_path_p[i] = self.str_to_char_p(entry)
 
-        self.amlg.StoreEntityToMemory(
-            handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf, entity_path_p, entity_path_len)
+        self._function("StoreEntityToMemory")(
+            handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf,
+            entity_path_p, entity_path_len)
 
         result = None
         if data_p.value is not None:
             result = string_at(data_p.value, data_len.value)
-            self.amlg.DeleteString.argtypes = [c_char_p]
-            self.amlg.DeleteString.restype = None
-            self.amlg.DeleteString(cast(data_p, c_char_p))
+            self._function("DeleteString")(cast(data_p, c_char_p))
 
         del handle_buf
         del file_type_buf
@@ -417,22 +426,18 @@ class CtypesLibrary:
 
     def destroy_entity(self, handle: str) -> None:
         """Call ``DestroyEntity``."""
-        self.amlg.DestroyEntity.argtypes = [c_char_p]
         handle_buf = self.str_to_char_p(handle)
 
-        self.amlg.DestroyEntity(handle_buf)
+        self._function("DestroyEntity")(handle_buf)
 
         del handle_buf
 
     def set_random_seed(self, handle: str, rand_seed: str) -> bool:
         """Call ``SetRandomSeed``."""
-        self.amlg.SetRandomSeed.argtypes = [c_char_p, c_char_p]
-        self.amlg.SetRandomSeed.restype = c_bool
-
         handle_buf = self.str_to_char_p(handle)
         rand_seed_buf = self.str_to_char_p(rand_seed)
 
-        result = self.amlg.SetRandomSeed(handle_buf, rand_seed_buf)
+        result = self._function("SetRandomSeed")(handle_buf, rand_seed_buf)
 
         del handle_buf
         del rand_seed_buf
@@ -440,10 +445,8 @@ class CtypesLibrary:
 
     def get_entities(self) -> list[str]:
         """Call ``GetEntities``."""
-        self.amlg.GetEntities.argtypes = [POINTER(c_uint64)]
-        self.amlg.GetEntities.restype = POINTER(c_char_p)
         num_entities = c_uint64()
-        entities = self.amlg.GetEntities(byref(num_entities))
+        entities = self._function("GetEntities")(byref(num_entities))
         result = [entities[i].decode() for i in range(num_entities.value)]
 
         del entities
@@ -452,14 +455,11 @@ class CtypesLibrary:
 
     def execute_entity_json(self, handle: str, label: str, json: str | bytes) -> bytes | None:
         """Call ``ExecuteEntityJsonPtr``."""
-        self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
-        self.amlg.ExecuteEntityJsonPtr.argtypes = [
-            c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
 
-        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
+        result = self.char_p_to_bytes(self._function("ExecuteEntityJsonPtr")(
             handle_buf, label_buf, json_buf))
 
         del handle_buf
@@ -471,14 +471,11 @@ class CtypesLibrary:
         self, handle: str, label: str, json: str | bytes
     ) -> tuple[bytes | None, bytes | None]:
         """Call ``ExecuteEntityJsonPtrLogged``."""
-        self.amlg.ExecuteEntityJsonPtrLogged.restype = _ResultWithLog
-        self.amlg.ExecuteEntityJsonPtrLogged.argtypes = [
-            c_char_p, c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         label_buf = self.str_to_char_p(label)
         json_buf = self.str_to_char_p(json)
 
-        c_result = self.amlg.ExecuteEntityJsonPtrLogged(
+        c_result = self._function("ExecuteEntityJsonPtrLogged")(
             handle_buf, label_buf, json_buf)
         result = self.char_p_to_bytes(c_result.json), self.char_p_to_bytes(c_result.log)
 
@@ -489,13 +486,10 @@ class CtypesLibrary:
 
     def eval_on_entity(self, handle: str, amlg: str | bytes) -> bytes | None:
         """Call ``EvalOnEntity``."""
-        self.amlg.EvalOnEntity.restype = POINTER(c_char)
-        self.amlg.EvalOnEntity.argtypes = [
-            c_char_p, c_char_p]
         handle_buf = self.str_to_char_p(handle)
         amlg_buf = self.str_to_char_p(amlg)
 
-        result = self.char_p_to_bytes(self.amlg.EvalOnEntity(
+        result = self.char_p_to_bytes(self._function("EvalOnEntity")(
             handle_buf, amlg_buf))
 
         del handle_buf
@@ -504,10 +498,8 @@ class CtypesLibrary:
 
     def get_version_string(self) -> bytes | None:
         """Call ``GetVersionString``."""
-        self.amlg.GetVersionString.restype = POINTER(c_char)
-        return self.char_p_to_bytes(self.amlg.GetVersionString())
+        return self.char_p_to_bytes(self._function("GetVersionString")())
 
     def get_concurrency_type_string(self) -> bytes | None:
         """Call ``GetConcurrencyTypeString``."""
-        self.amlg.GetConcurrencyTypeString.restype = POINTER(c_char)
-        return self.char_p_to_bytes(self.amlg.GetConcurrencyTypeString())
+        return self.char_p_to_bytes(self._function("GetConcurrencyTypeString")())

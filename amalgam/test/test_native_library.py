@@ -1,5 +1,7 @@
 """Behavior shared by every native backend, checked against the real engine."""
+import _ctypes
 from collections.abc import Callable
+from ctypes import CDLL
 import json
 from pathlib import Path
 import threading
@@ -7,6 +9,7 @@ import time
 
 import pytest
 
+from amalgam._ctypes_library import CtypesLibrary
 from amalgam._types import NativeLibrary
 
 
@@ -201,3 +204,21 @@ def test_engine_calls_release_the_gil(native_library: NativeLibrary, entity: str
     worker.join()
     assert time.perf_counter() - started > 0.1, "the busy label returned too quickly to measure"
     assert ticks > 20
+
+
+def test_clone_entity_returns_bool(
+    native_library: NativeLibrary, entity: str, new_native_handle: Callable[[], str]
+) -> None:
+    """clone_entity reports success as a bool."""
+    assert native_library.clone_entity(entity, new_native_handle(), "", "", False, "", "", "") is True
+    assert native_library.clone_entity("missing", new_native_handle(), "", "", False, "", "", "") is False
+
+
+def test_ctypes_missing_entry_point_fails_when_called() -> None:
+    """A CtypesLibrary over a library without an entry point fails only when that entry point is called."""
+    other_library = getattr(_ctypes, "__file__", None)
+    if other_library is None:
+        pytest.skip("_ctypes is built into this interpreter")
+    library = CtypesLibrary(CDLL(other_library))
+    with pytest.raises(AttributeError, match="GetVersionString"):
+        library.get_version_string()
