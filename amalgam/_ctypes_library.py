@@ -64,7 +64,7 @@ _SIGNATURES: tuple[tuple[str, t.Any, tuple[t.Any, ...]], ...] = (
      (c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t)),
     ("DestroyEntity", None, (c_char_p,)),
     ("SetRandomSeed", c_bool, (c_char_p, c_char_p)),
-    ("GetEntities", POINTER(c_char_p), (POINTER(c_uint64),)),
+    ("GetEntities", POINTER(_CHAR_P), (POINTER(c_uint64),)),
     ("ExecuteEntityJsonPtr", _CHAR_P, (c_char_p, c_char_p, c_char_p)),
     ("ExecuteEntityJsonPtrLogged", _ResultWithLog, (c_char_p, c_char_p, c_char_p)),
     ("EvalOnEntity", _CHAR_P, (c_char_p, c_char_p)),
@@ -316,10 +316,15 @@ class CtypesLibrary:
         return self._function("SetRandomSeed")(_encode(handle), _encode(rand_seed))
 
     def get_entities(self) -> list[str]:
-        """Call ``GetEntities``."""
+        """Call ``GetEntities``; every returned string and the array itself are freed."""
         num_entities = c_uint64()
         entities = self._function("GetEntities")(byref(num_entities))
-        return [entities[i].decode() for i in range(num_entities.value)]
+        try:
+            raw = [self.char_p_to_bytes(entities[i]) or b"" for i in range(num_entities.value)]
+        finally:
+            if entities:
+                self._function("DeleteString")(cast(entities, c_char_p))
+        return [handle.decode() for handle in raw]
 
     def execute_entity_json(self, handle: Text, label: Text, json: Text, /) -> bytes | None:
         """Call ``ExecuteEntityJsonPtr``."""
