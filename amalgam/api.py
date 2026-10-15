@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from base64 import b64encode
-from ctypes import (
-    _Pointer, Array, byref, c_bool, c_char, c_char_p, c_size_t, c_uint64, c_void_p,
-    cast, cdll, POINTER, Structure, string_at
-)
+from ctypes import _Pointer, Array, c_char, c_char_p
 from datetime import datetime
 import gc
 import json as json_lib
@@ -16,54 +13,37 @@ import threading
 import typing as t
 import warnings
 
+from amalgam._ctypes_library import _ResultWithLog, CtypesLibrary
+
 # Set to amalgam
 _logger = logging.getLogger('amalgam')
-
-
-class _LoadEntityStatus(Structure):
-    """
-    A private status returned from Amalgam binary LoadEntity C API.
-
-    This is implemented with ctypes for accessing binary Amalgam builds.
-    """
-
-    _fields_ = [
-        ("loaded", c_bool),
-        ("message", POINTER(c_char)),
-        ("version", POINTER(c_char)),
-        ("entity_path", POINTER(POINTER(c_char))),
-        ("entity_path_len", c_size_t)
-    ]
 
 
 class LoadEntityStatus:
     """
     Status returned by :func:`~api.Amalgam.load_entity`.
 
-    This is implemented with python types and is meant to wrap _LoadEntityStatus
-    which uses ctypes and directly interacts with the Amalgam binaries.
-
     Parameters
     ----------
     api : Amalgam
         The Python Amalgam interface.
-    c_status : _LoadEntityStatus, optional
-        _LoadEntityStatus instance.
+    status : tuple, optional
+        ``(loaded, message, version, entity_path)`` from the native backend.
     """
 
-    def __init__(self, api: Amalgam, c_status: t.Optional[_LoadEntityStatus] = None):  # pyright: ignore[reportMissingSuperCall]
+    def __init__(  # pyright: ignore[reportMissingSuperCall]
+        self,
+        api: Amalgam,
+        status: tuple[bool, str | None, str | None, list[str | None]] | None = None
+    ):
         """Initialize LoadEntityStatus."""
-        if c_status is None:
+        if status is None:
             self.loaded = True
             self.message = ""
             self.version = ""
             self.entity_path = []
         else:
-            self.loaded = bool(c_status.loaded)
-            self.message = api.char_p_to_str(c_status.message)
-            self.version = api.char_p_to_str(c_status.version)
-            self.entity_path = [api.char_p_to_str(c_status.entity_path[i]) for i in range(c_status.entity_path_len)]
-            api.amlg.DeleteString(cast(c_status.entity_path, c_char_p))
+            self.loaded, self.message, self.version, self.entity_path = status
 
 
     def __str__(self) -> str:
@@ -80,14 +60,6 @@ class LoadEntityStatus:
             eps = (f'"{step}"' for step in self.entity_path)
             ep = f",[{','.join(eps)}]"
         return f"{self.loaded},\"{self.message}\",\"{self.version}\"{ep}"
-
-
-class _ResultWithLog(Structure):
-    """The C-native version of :class:`ResultWithLog`."""
-    _fields_ = [
-        ("json", POINTER(c_char)),
-        ("log", POINTER(c_char))
-    ]
 
 
 class ResultWithLog:
@@ -273,7 +245,7 @@ class Amalgam:
 
         _logger.debug(f"Loading amalgam library: {self.library_path}")
         _logger.debug(f"SBF_DATASTORE enabled: {sbf_datastore_enabled}")
-        self.amlg = cdll.LoadLibrary(str(self.library_path))
+        self.amlg = CtypesLibrary(str(self.library_path))
         if sbf_datastore_enabled is not None:
             self.set_amlg_flags(sbf_datastore_enabled)
         if max_num_threads is not None:
@@ -492,8 +464,7 @@ class Amalgam:
         bool
             True if sbf tree structures are currently enabled.
         """
-        self.amlg.IsSBFDataStoreEnabled.restype = c_bool
-        return self.amlg.IsSBFDataStoreEnabled()
+        return self.amlg.is_sbf_datastore_enabled()
 
     def set_amlg_flags(self, sbf_datastore_enabled: bool = True):
         """
@@ -504,9 +475,7 @@ class Amalgam:
         sbf_datastore_enabled : bool, default True
             If true, sbf tree structures are enabled.
         """
-        self.amlg.SetSBFDataStoreEnabled.argtypes = [c_bool]
-        self.amlg.SetSBFDataStoreEnabled.restype = c_void_p
-        self.amlg.SetSBFDataStoreEnabled(sbf_datastore_enabled)
+        self.amlg.set_sbf_datastore_enabled(sbf_datastore_enabled)
 
     def get_max_num_threads(self) -> int:
         """
@@ -517,9 +486,8 @@ class Amalgam:
         int
             The maximum number of threads that Amalgam is configured to use.
         """
-        self.amlg.GetMaxNumThreads.restype = c_size_t
         self._log_execution(b"GET_MAX_NUM_THREADS")
-        result = self.amlg.GetMaxNumThreads()
+        result = self.amlg.get_max_num_threads()
         self._log_reply(result)
 
         return result
@@ -537,12 +505,9 @@ class Amalgam:
             of threads to the value specified. If 0, will use the number of
             visible logical cores.
         """
-        self.amlg.SetMaxNumThreads.argtypes = [c_size_t]
-        self.amlg.SetMaxNumThreads.restype = c_void_p
-
         self._log_execution(f"SET_MAX_NUM_THREADS {max_num_threads}".encode())
-        result = self.amlg.SetMaxNumThreads(max_num_threads)
-        self._log_reply(result)
+        self.amlg.set_max_num_threads(max_num_threads)
+        self._log_reply(None)
 
     def get_num_active_threads(
         self
@@ -563,10 +528,7 @@ class Amalgam:
         int
             The current number of active threads.
         """
-        self.amlg.GetNumActiveThreads.argtypes = []
-        self.amlg.GetNumActiveThreads.restype = c_size_t
-
-        result = self.amlg.GetNumActiveThreads()
+        result = self.amlg.get_num_active_threads()
 
         return result
 
@@ -581,13 +543,8 @@ class Amalgam:
         bytes
             JSON containing the current parameters.
         """
-        self.amlg.GetGarbageCollectionParams.argtypes = []
-        self.amlg.GetGarbageCollectionParams.restype = POINTER(c_char)
-
         self._log_execution(b"GET_GARBAGE_COLLECTION_PARAMS")
-        result = self.char_p_to_bytes(
-            self.amlg.GetGarbageCollectionParams()
-        )
+        result = self.amlg.get_garbage_collection_params()
         self._log_reply(result)
 
         return result
@@ -611,18 +568,12 @@ class Amalgam:
             extra_memory_capacity_factor, min_memory_retention_factor,
             and alloc_expansion_factor.
         """
-        self.amlg.SetGarbageCollectionParams.argtypes = [c_char_p]
-        self.amlg.SetGarbageCollectionParams.restype = None
-        params_buf = self.str_to_char_p(json_params)
-
         self._log_execution_std(
             b"SET_GARBAGE_COLLECTION_PARAMS",
             suffix=json_params
         )
-        self.amlg.SetGarbageCollectionParams(params_buf)
+        self.amlg.set_garbage_collection_params(json_params)
         self._log_reply(None)
-
-        del params_buf
 
     def reset_trace(self, file: str):
         """
@@ -830,12 +781,7 @@ class Amalgam:
         Array of c_char
             An Array of C char datatypes which form the given string
         """
-        if isinstance(value, str):
-            value = value.encode('utf-8')
-        buftype = c_char * (size if size is not None else (len(value) + 1))
-        buf = buftype()
-        buf.value = value
-        return buf
+        return self.amlg.str_to_char_p(value, size)
 
     def char_p_to_bytes(self, p: _Pointer[c_char] | c_char_p) -> bytes | None:
         """
@@ -851,13 +797,7 @@ class Amalgam:
         bytes or None
             The byte-encoded char
         """
-        bytes_str = cast(p, c_char_p).value
-
-        self.amlg.DeleteString.argtypes = [c_char_p]
-        self.amlg.DeleteString.restype = None
-        self.amlg.DeleteString(p)
-
-        return bytes_str
+        return self.amlg.char_p_to_bytes(p)
 
     def char_p_to_str(self, p: _Pointer[c_char] | c_char_p) -> str | None:
         """
@@ -873,14 +813,7 @@ class Amalgam:
         str or None
             The resulting string
         """
-        b = self.char_p_to_bytes(p)
-        s: str | None = None
-        if b is not None:
-            try:
-                s = b.decode("UTF-8")
-            except UnicodeDecodeError:
-                s = None
-        return s
+        return self.amlg.char_p_to_str(p)
 
     def get_json_from_label(self, handle: str, label: str) -> bytes:
         """
@@ -898,17 +831,10 @@ class Amalgam:
         bytes
             The byte-encoded json representation of the amalgam label.
         """
-        self.amlg.GetJSONPtrFromLabel.restype = POINTER(c_char)
-        self.amlg.GetJSONPtrFromLabel.argtypes = [c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-
         self._log_execution_std(b"GET_JSON_FROM_LABEL", handle, label)
-        result = self.char_p_to_bytes(self.amlg.GetJSONPtrFromLabel(handle_buf, label_buf))
+        result = self.amlg.get_json_from_label(handle, label)
         self._log_reply(result)
 
-        del handle_buf
-        del label_buf
         self.gc()
 
         return result
@@ -931,19 +857,10 @@ class Amalgam:
         json : str or bytes
             The json representation of the label value.
         """
-        self.amlg.SetJSONToLabel.restype = c_void_p
-        self.amlg.SetJSONToLabel.argtypes = [c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-
         self._log_execution_std(b"SET_JSON_TO_LABEL", handle, label, suffix=json)
-        self.amlg.SetJSONToLabel(handle_buf, label_buf, json_buf)
+        self.amlg.set_json_to_label(handle, label, json)
         self._log_reply(None)
 
-        del handle_buf
-        del label_buf
-        del json_buf
         self.gc()
 
     def load_entity(
@@ -991,25 +908,6 @@ class Amalgam:
         LoadEntityStatus
             Status of LoadEntity call.
         """
-        self.amlg.LoadEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
-            c_size_t]
-        self.amlg.LoadEntity.restype = _LoadEntityStatus
-        handle_buf = self.str_to_char_p(handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
-
         self.load_command_log_entry = (
             f"LOAD_ENTITY \"{self.escape_double_quotes(handle)}\" "
             f"\"{self.escape_double_quotes(file_path)}\" "
@@ -1018,22 +916,10 @@ class Amalgam:
             f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
         ).encode()
         self._log_execution(self.load_command_log_entry)
-        result = LoadEntityStatus(self, self.amlg.LoadEntity(
-            handle_buf, file_path_buf, file_type_buf, persist,
-            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
+        result = LoadEntityStatus(self, self.amlg.load_entity(
+            handle, file_path, file_type, persist, json_file_params, write_log, print_log, entity_path))
         self._log_reply(result)
 
-        del handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
         self.gc()
 
         return result
@@ -1080,24 +966,6 @@ class Amalgam:
         LoadEntityStatus
             Status of LoadEntity call.
         """
-        self.amlg.LoadEntityFromMemory.argtypes = [
-            c_char_p, c_void_p, c_size_t, c_char_p, c_bool, c_char_p, c_char_p, c_char_p, POINTER(c_char_p),
-            c_size_t]
-        self.amlg.LoadEntityFromMemory.restype = _LoadEntityStatus
-        handle_buf = self.str_to_char_p(handle)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = cast(self.str_to_char_p(entry), c_char_p)
-
         self.load_command_log_entry = (
             f"LOAD_ENTITY_FROM_MEMORY \"{self.escape_double_quotes(handle)}\" "
             f"\"{b64encode(contents).decode()}\" "
@@ -1106,21 +974,10 @@ class Amalgam:
             f"\"{write_log}\" \"{print_log}\" \"\" \"{' '.join(entity_path or [])}\""
         ).encode()
         self._log_execution(self.load_command_log_entry)
-        result = LoadEntityStatus(self, self.amlg.LoadEntityFromMemory(
-            handle_buf, contents, len(contents), file_type_buf, False,
-            json_file_params_buf, write_log_buf, print_log_buf, entity_path_p, entity_path_len))
+        result = LoadEntityStatus(self, self.amlg.load_entity_from_memory(
+            handle, contents, file_type, json_file_params, write_log, print_log, entity_path))
         self._log_reply(result)
 
-        del handle_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
         self.gc()
 
         return result
@@ -1142,15 +999,10 @@ class Amalgam:
         LoadEntityStatus
             Status of VerifyEntity call.
         """
-        self.amlg.VerifyEntity.argtypes = [c_char_p]
-        self.amlg.VerifyEntity.restype = _LoadEntityStatus
-        file_path_buf = self.str_to_char_p(file_path)
-
         self._log_execution_std(b"VERIFY_ENTITY", file_path)
-        result = LoadEntityStatus(self, self.amlg.VerifyEntity(file_path_buf))
+        result = LoadEntityStatus(self, self.amlg.verify_entity(file_path))
         self._log_reply(result)
 
-        del file_path_buf
         self.gc()
 
         return result
@@ -1172,15 +1024,10 @@ class Amalgam:
         str
             A JSON object representing the entity permissions.
         """
-        self.amlg.GetEntityPermissions.argtypes = [c_char_p]
-        self.amlg.GetEntityPermissions.restype = POINTER(c_char)
-        handle_buf = self.str_to_char_p(handle)
-
         self._log_execution_std(b"GET_ENTITY_PERMISSIONS", handle)
-        result = self.char_p_to_bytes(self.amlg.GetEntityPermissions(handle_buf))
+        result = self.amlg.get_entity_permissions(handle)
         self._log_reply(result)
 
-        del handle_buf
         self.gc()
 
         return result
@@ -1207,17 +1054,10 @@ class Amalgam:
         bool
             True if the set was successful, false if not.
         """
-        self.amlg.SetEntityPermissions.argtypes = [c_char_p, c_char_p]
-        self.amlg.SetEntityPermissions.restype = c_bool
-        handle_buf = self.str_to_char_p(handle)
-        json_permissions_buf = self.str_to_char_p(json_permissions)
-
         self._log_execution_std(b"SET_ENTITY_PERMISSIONS", handle, suffix=json_permissions)
-        result = self.amlg.SetEntityPermissions(handle_buf, json_permissions_buf)
+        result = self.amlg.set_entity_permissions(handle, json_permissions)
         self._log_reply(result)
 
-        del handle_buf
-        del json_permissions_buf
         self.gc()
 
         return result
@@ -1266,16 +1106,6 @@ class Amalgam:
         bool
             True if cloned successfully, False if not.
         """
-        self.amlg.CloneEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_char_p, c_bool, c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        clone_handle_buf = self.str_to_char_p(clone_handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        write_log_buf = self.str_to_char_p(write_log)
-        print_log_buf = self.str_to_char_p(print_log)
-
         self._log_execution_std(b"CLONE_ENTITY", handle, clone_handle, file_path, file_type,
                                 suffix=(
                                     f"{str(persist).lower()} "
@@ -1283,18 +1113,10 @@ class Amalgam:
                                     f"\"{write_log}\" \"{print_log}\""
                                 )
         )
-        result = self.amlg.CloneEntity(
-            handle_buf, clone_handle_buf, file_path_buf, file_type_buf, persist,
-            json_file_params_buf, write_log_buf, print_log_buf)
+        result = self.amlg.clone_entity(
+            handle, clone_handle, file_path, file_type, persist, json_file_params, write_log, print_log)
         self._log_reply(result)
 
-        del handle_buf
-        del clone_handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        del write_log_buf
-        del print_log_buf
         self.gc()
 
         return result
@@ -1336,37 +1158,11 @@ class Amalgam:
         bool
             True if the entity file was saved successfully, False otherwise.
         """
-        self.amlg.StoreEntity.argtypes = [
-            c_char_p, c_char_p, c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntity.restype = c_bool
-        handle_buf = self.str_to_char_p(handle)
-        file_path_buf = self.str_to_char_p(file_path)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = self.str_to_char_p(entry)
-
         self._log_execution_std(b"STORE_ENTITY", handle, file_path, file_type,
                                 suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
-        result = self.amlg.StoreEntity(
-            handle_buf, file_path_buf, file_type_buf, persist, json_file_params_buf, entity_path_p, entity_path_len)
+        result = self.amlg.store_entity(handle, file_path, file_type, persist, json_file_params, entity_path)
         self._log_reply(result)
 
-        del handle_buf
-        del file_path_buf
-        del file_type_buf
-        del json_file_params_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
         self.gc()
         return result
 
@@ -1401,46 +1197,14 @@ class Amalgam:
         bytes | None
             The serialized entity contents, or None on an error.
         """
-        self.amlg.StoreEntityToMemory.argtypes = [
-            c_char_p, POINTER(c_void_p), POINTER(c_size_t), c_char_p, c_bool, c_char_p, POINTER(c_char_p), c_size_t]
-        self.amlg.StoreEntityToMemory.restype = c_bool
-        handle_buf = self.str_to_char_p(handle)
-        data_p = c_void_p(None)
-        data_len = c_size_t(0)
-        file_type_buf = self.str_to_char_p(file_type)
-        json_file_params_buf = self.str_to_char_p(json_file_params)
-        entity_path_p = None
-        entity_path_len = 0
-
-        if entity_path is not None and len(entity_path) > 0:
-            entity_path_len = len(entity_path)
-            entity_path_p = (c_char_p * entity_path_len)()
-            for i, entry in enumerate(entity_path):
-                entity_path_p[i] = self.str_to_char_p(entry)
-
         self._log_execution_std(b"STORE_ENTITY_TO_MEMORY", handle, file_type,
                                 suffix=f"false {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
-        self.amlg.StoreEntityToMemory(
-            handle_buf, byref(data_p), byref(data_len), file_type_buf, False, json_file_params_buf, entity_path_p, entity_path_len)
-
-        result = None
-        if data_p.value is not None:
-            result = string_at(data_p.value, data_len.value)
-            self.amlg.DeleteString.argtypes = [c_char_p]
-            self.amlg.DeleteString.restype = None
-            self.amlg.DeleteString(cast(data_p, c_char_p))
+        result = self.amlg.store_entity_to_memory(handle, file_type, json_file_params, entity_path)
+        if result is not None:
             self._log_reply(b64encode(result).decode())
         else:
             self._log_reply(None)
 
-        del handle_buf
-        del file_type_buf
-        del json_file_params_buf
-        if entity_path_p is not None:
-            for i in range(entity_path_len):
-                entry_buf = entity_path_p[i]
-                del entry_buf
-            del entity_path_p
         self.gc()
         return result
 
@@ -1456,14 +1220,10 @@ class Amalgam:
         handle : str
             The handle of the amalgam entity.
         """
-        self.amlg.DestroyEntity.argtypes = [c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-
         self._log_execution_std(b"DESTROY_ENTITY", handle)
-        self.amlg.DestroyEntity(handle_buf)
+        self.amlg.destroy_entity(handle)
         self._log_reply(None)
 
-        del handle_buf
         self.gc()
 
     def set_random_seed(
@@ -1486,18 +1246,10 @@ class Amalgam:
         bool
             True if the set was successful, false if not.
         """
-        self.amlg.SetRandomSeed.argtypes = [c_char_p, c_char_p]
-        self.amlg.SetRandomSeed.restype = c_bool
-
-        handle_buf = self.str_to_char_p(handle)
-        rand_seed_buf = self.str_to_char_p(rand_seed)
-
         self._log_execution_std(b"SET_RANDOM_SEED", handle, rand_seed)
-        result = self.amlg.SetRandomSeed(handle_buf, rand_seed_buf)
+        result = self.amlg.set_random_seed(handle, rand_seed)
         self._log_reply(None)
 
-        del handle_buf
-        del rand_seed_buf
         self.gc()
         return result
 
@@ -1510,14 +1262,7 @@ class Amalgam:
         list of str
             The list of entity handles.
         """
-        self.amlg.GetEntities.argtypes = [POINTER(c_uint64)]
-        self.amlg.GetEntities.restype = POINTER(c_char_p)
-        num_entities = c_uint64()
-        entities = self.amlg.GetEntities(byref(num_entities))
-        result = [entities[i].decode() for i in range(num_entities.value)]
-
-        del entities
-        del num_entities
+        result = self.amlg.get_entities()
         self.gc()
 
         return result
@@ -1545,23 +1290,11 @@ class Amalgam:
         bytes
             A byte-encoded json representation of the response.
         """
-        self.amlg.ExecuteEntityJsonPtr.restype = POINTER(c_char)
-        self.amlg.ExecuteEntityJsonPtr.argtypes = [
-            c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON", handle, label, suffix=json)
-        result = self.char_p_to_bytes(self.amlg.ExecuteEntityJsonPtr(
-            handle_buf, label_buf, json_buf))
+        result = self.amlg.execute_entity_json(handle, label, json)
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
-
-        del handle_buf
-        del label_buf
-        del json_buf
 
         return result
 
@@ -1590,23 +1323,12 @@ class Amalgam:
             Both a JSON-encoded response and the Amalgam-format transaction log entry.
 
         """
-        self.amlg.ExecuteEntityJsonPtrLogged.restype = _ResultWithLog
-        self.amlg.ExecuteEntityJsonPtrLogged.argtypes = [
-            c_char_p, c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        label_buf = self.str_to_char_p(label)
-        json_buf = self.str_to_char_p(json)
-
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EXECUTE_ENTITY_JSON_LOGGED", handle, label, suffix=json)
-        result = ResultWithLog.from_c_result(self, self.amlg.ExecuteEntityJsonPtrLogged(
-            handle_buf, label_buf, json_buf))
+        result_json, result_log = self.amlg.execute_entity_json_logged(handle, label, json)
+        result = ResultWithLog(json=result_json, log=result_log)
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
-
-        del handle_buf
-        del label_buf
-        del json_buf
 
         return result
 
@@ -1631,21 +1353,11 @@ class Amalgam:
             A byte-encoded json representation of the response.
 
         """
-        self.amlg.EvalOnEntity.restype = POINTER(c_char)
-        self.amlg.EvalOnEntity.argtypes = [
-            c_char_p, c_char_p]
-        handle_buf = self.str_to_char_p(handle)
-        amlg_buf = self.str_to_char_p(amlg)
-
         self._log_time("EXECUTION START")
         self._log_execution_std(b"EVAL_ON_ENTITY", handle, str(amlg))
-        result = self.char_p_to_bytes(self.amlg.EvalOnEntity(
-            handle_buf, amlg_buf))
+        result = self.amlg.eval_on_entity(handle, amlg)
         self._log_time("EXECUTION STOP")
         self._log_reply(result)
-
-        del handle_buf
-        del amlg_buf
 
         return result
 
@@ -1658,8 +1370,7 @@ class Amalgam:
         bytes
             A version byte-encoded string with semver.
         """
-        self.amlg.GetVersionString.restype = POINTER(c_char)
-        amlg_version = self.char_p_to_bytes(self.amlg.GetVersionString())
+        amlg_version = self.amlg.get_version_string()
         self._log_comment(f"call to amlg.GetVersionString() - returned: "
                           f"{amlg_version}\n")
         return amlg_version
@@ -1674,8 +1385,7 @@ class Amalgam:
             A byte-encoded string with library concurrency type.
             Ex. b'MultiThreaded'
         """
-        self.amlg.GetConcurrencyTypeString.restype = POINTER(c_char)
-        amlg_concurrency_type = self.char_p_to_bytes(self.amlg.GetConcurrencyTypeString())
+        amlg_concurrency_type = self.amlg.get_concurrency_type_string()
         self._log_comment(
             f"call to amlg.GetConcurrencyTypeString() - returned: "
             f"{amlg_concurrency_type}\n")
