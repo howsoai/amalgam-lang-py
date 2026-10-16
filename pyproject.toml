@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0.0", "wheel~=0.40.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77.0.3", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,12 +13,12 @@ authors = [
 ]
 requires-python = ">=3.11"
 keywords = ["machine", "learning", "artificial", "intelligence"]
-license = {file = "LICENSE.txt"}
+license = "AGPL-3.0-only"
+license-files = ["LICENSE.txt"]
 classifiers = [
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -51,6 +51,21 @@ repository = "https://github.com/howsoai/amalgam-lang-py"
 [tool.setuptools]
 packages = ["amalgam"]
 
+[[tool.setuptools.ext-modules]]
+name = "amalgam._api"
+sources = ["amalgam/_api.c"]
+py-limited-api = true
+optional = true
+
+[tool.setuptools.package-data]
+amalgam = ["_api.pyi"]
+
+[tool.setuptools.exclude-package-data]
+amalgam = ["*.c"]
+
+[tool.pytest.ini_options]
+testpaths = ["amalgam/test"]
+
 [tool.isort]
 profile = "google"
 known_first_party = ["howso"]
@@ -70,3 +85,31 @@ split_penalty_for_added_line_split = 300
 
 # version is managed by setuptools_scm
 [tool.setuptools_scm]
+
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *t-*"
+build-frontend = "build"
+# Tags the cp311 build as cp311-abi3; only cibuildwheel's (never free-threaded) builds apply it.
+config-settings = { "--build-option" = "--py-limited-api=cp311" }
+test-requires = ["pytest", "pytest-mock"]
+test-environment = { AMALGAM_PY_BACKEND = "c" }
+test-command = "python -c \"import amalgam._api\" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test"
+# The wheel bundles prebuilt Amalgam engine libraries that ship as built, and amalgam._api links only
+# against libc and libpython, so no repair tool runs on macOS or Windows. The Linux table below retags
+# its wheels instead of auditing them.
+repair-wheel-command = ""
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.linux]
+environment-pass = ["SETUPTOOLS_SCM_PRETEND_VERSION"]
+# Retags the wheel to the manylinux_2_28 baseline of the build container without auditwheel. cibuildwheel reuses
+# the abi3 wheel built for the first Python version in later builds only when its platform tag is manylinux.
+repair-wheel-command = """\
+python -m pip install wheel && \
+cp {wheel} {dest_dir} && \
+python -m wheel tags --remove --platform-tag manylinux_2_28_$(uname -m) {dest_dir}/$(basename {wheel})"""
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }

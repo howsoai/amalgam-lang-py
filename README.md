@@ -48,10 +48,22 @@ The wrapper handles the Amalgam language binary (so/dll/dylib) automatically for
 amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 ```
 
-## Testing
-There is a `Pytest` unit test suite located in `amalgam/test`. The tests in `test_standalone.py` will only execute if an `Amalgam` binary is located in the default expected path of `amalgam/lib/{os}/{architecture}`.
+### Native backends
 
-To specify whether `test_standalone.py` should use single-threaded or multi-threaded `Amalgam` (assuming the appropriate binary is in the above path), set the `AMALGAM_LIBRARY_POSTFIX` environment variable to the desired postfix, e.g., `-st` or `-mt`.
+The wrapper calls the Amalgam C library through one of two backends: the compiled C extension `amalgam._api`, or a fallback backend that calls the library through `ctypes`. Both backends pass `bytes` arguments to the engine without copying them; the C extension also passes ASCII `str` arguments, such as `json.dumps()` output, without the UTF-8 copy the `ctypes` backend makes, which matters for large payloads. The `AMALGAM_PY_BACKEND` environment variable selects one:
+
+- `auto` (the default, also used when the variable is unset or empty) uses the C extension when it is installed and `ctypes` otherwise.
+- `c` uses the C extension, and raises `ImportError` when it is not installed.
+- `ctypes` always uses `ctypes`.
+
+Releases publish `cp311-abi3` wheels that include the C extension for Linux (manylinux, x86_64 and aarch64), macOS (arm64), and Windows (amd64), plus a `py3-none-any` wheel without it that always uses `ctypes`. A source or editable install (`pip install .` or `pip install -e .`) compiles it, which needs a C compiler; without one, the install still succeeds and uses the `ctypes` backend.
+
+## Testing
+There is a `Pytest` unit test suite located in `amalgam/test`. Most tests load the Amalgam library from `amalgam/lib/{os}/{architecture}` and are skipped when it is not there; link or copy the libraries from a local [Amalgam](https://github.com/howsoai/amalgam) build into that directory, or download a release matching `version.json` and copy its `lib/` files there.
+
+To specify whether the tests should use single-threaded or multi-threaded `Amalgam`, set the `AMALGAM_LIBRARY_POSTFIX` environment variable to the desired postfix, e.g., `-st` or `-mt`.
+
+Tests that call the library run once per native backend. The C extension backend is skipped when the extension is not built; pass `--require-c-extension` (on by default when the `CI` environment variable is set to a truthy value, meaning anything other than empty, `0`, `false`, `no`, or `off`, ignoring case and surrounding whitespace) to make a missing extension a test failure instead.
 
 ## License
 

@@ -1,3 +1,19 @@
-(null
-    #hello_howso "Hello Howso!"
-)
+{
+	hello_howso
+	"Hello Howso!"
+
+	echo
+	(declare
+		(assoc payload .null)
+		payload
+	)
+
+	busy
+	(declare
+		(assoc n 10000000 i 0)
+		(while (< i n)
+			(assign "i" (+ i 1))
+		)
+		i
+	)
+}
