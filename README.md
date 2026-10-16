@@ -50,7 +50,7 @@ amlg = Amalgam(library_path="/path/to/amalgam-mt.so")
 
 ### Native backends
 
-The wrapper calls the Amalgam C library through one of two backends: the compiled C extension `amalgam._api`, or a fallback backend that calls the library through `ctypes`. The C extension is faster and uses less memory, because it passes Python `str` and `bytes` buffers to the engine without copying them. The `AMALGAM_PY_BACKEND` environment variable selects one:
+The wrapper calls the Amalgam C library through one of two backends: the compiled C extension `amalgam._api`, or a fallback backend that calls the library through `ctypes`. Both backends pass `bytes` arguments to the engine without copying them; the C extension also passes ASCII `str` arguments, such as `json.dumps()` output, without the UTF-8 copy the `ctypes` backend makes, which matters for large payloads. The `AMALGAM_PY_BACKEND` environment variable selects one:
 
 - `auto` (the default, also used when the variable is unset or empty) uses the C extension when it is installed and `ctypes` otherwise.
 - `c` uses the C extension, and raises `ImportError` when it is not installed.
