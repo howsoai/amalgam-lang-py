@@ -96,13 +96,20 @@ test-requires = ["pytest", "pytest-mock"]
 test-environment = { AMALGAM_PY_BACKEND = "c" }
 test-command = "python -c \"import amalgam._api\" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test"
 # The wheel bundles prebuilt Amalgam engine libraries that ship as built, and amalgam._api links only
-# against libc and libpython, so no repair tool runs.
+# against libc and libpython, so no repair tool runs on macOS or Windows. The Linux table below retags
+# its wheels instead of auditing them.
 repair-wheel-command = ""
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
 environment-pass = ["SETUPTOOLS_SCM_PRETEND_VERSION"]
+# Retags the wheel to the manylinux_2_28 baseline of the build container without auditwheel. cibuildwheel reuses
+# the abi3 wheel built for the first Python version in later builds only when its platform tag is manylinux.
+repair-wheel-command = """\
+python -m pip install wheel && \
+cp {wheel} {dest_dir} && \
+python -m wheel tags --remove --platform-tag manylinux_2_28_$(uname -m) {dest_dir}/$(basename {wheel})"""
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }
