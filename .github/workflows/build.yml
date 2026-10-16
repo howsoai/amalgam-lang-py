@@ -253,6 +253,44 @@ jobs:
         path: wheelhouse/*.whl
         if-no-files-found: error
 
+  pytest-linux-3-13t-mt:
+    name: Pytest (Linux, Python 3.13t, MT, source build)
+    needs: ["metadata", "fetch-engine"]
+    runs-on: ubuntu-latest
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
+      AMALGAM_LIBRARY_POSTFIX: "-mt"
+      AMALGAM_PY_BACKEND: "c"
+    steps:
+
+    - uses: actions/checkout@v6
+
+    - name: Set up free-threaded Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13t"
+
+    - name: Download engine libraries
+      uses: actions/download-artifact@v8
+      with:
+        name: engine-lib-manylinux_2_29_x86_64
+        path: amalgam/lib
+
+    - name: Build C extension from source
+      run: python -m pip install -e . pytest pytest-mock
+
+    - name: Verify free-threaded import and run tests
+      run: |
+        python - <<'PY'
+        import sys
+        import sysconfig
+        assert sysconfig.get_config_var("Py_GIL_DISABLED") == 1
+        import amalgam._api
+        assert not sys._is_gil_enabled()
+        PY
+        test -f amalgam/lib/linux/amd64/amalgam-mt.so
+        python -m pytest --require-c-extension --import-mode=importlib -p no:cacheprovider amalgam/test
+
   build-pure:
     name: Build (any)
     needs: ["metadata", "fetch-engine"]
@@ -300,7 +338,7 @@ jobs:
         if-no-files-found: error
 
   workflow-summary:
-    needs: ['metadata', 'build', 'build-pure']
+    needs: ['metadata', 'build', 'build-pure', 'pytest-linux-3-13t-mt']
     uses: "howsoai/.github/.github/workflows/workflow-summary.yml@main"
     secrets: inherit
     with:

@@ -29,6 +29,7 @@ class _LoadEntityStatus(Structure):
 
 class _ResultWithLog(Structure):
     """The C-native version of :class:`ResultWithLog`."""
+
     _fields_ = [
         ("json", POINTER(c_char)),
         ("log", POINTER(c_char))

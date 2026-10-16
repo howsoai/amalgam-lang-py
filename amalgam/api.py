@@ -971,7 +971,6 @@ class Amalgam:
 
         return result
 
-
     def set_entity_permissions(
         self,
         handle: str,
@@ -979,6 +978,7 @@ class Amalgam:
     ) -> bool:
         """
         Set the entity permissions to the object in json_permissions.
+
         See Amalgam language documentation for details of valid permissions.
 
         Parameters
@@ -1051,7 +1051,7 @@ class Amalgam:
                                     f"{json_lib.dumps(json_file_params)} "
                                     f"\"{write_log}\" \"{print_log}\""
                                 )
-        )
+                                )
         result = self.amlg.clone_entity(
             handle, clone_handle, file_path, file_type, persist, json_file_params, write_log, print_log)
         self._log_reply(result)
@@ -1098,7 +1098,8 @@ class Amalgam:
             True if the entity file was saved successfully, False otherwise.
         """
         self._log_execution_std(b"STORE_ENTITY", handle, file_path, file_type,
-                                suffix=f"{str(persist).lower()} {json_lib.dumps(json_file_params)} \"{' '.join(entity_path or [])}\"")
+                                suffix=(f"{str(persist).lower()} {json_lib.dumps(json_file_params)} "
+                                        f"\"{' '.join(entity_path or [])}\""))
         result = self.amlg.store_entity(handle, file_path, file_type, persist, json_file_params, entity_path)
         self._log_reply(result)
 
