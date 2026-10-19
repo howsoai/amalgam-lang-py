@@ -43,76 +43,131 @@ typedef struct {
     char *log;
 } AmlgResultWithLog;
 
-typedef void (*AmlgDeleteStringFn)(char *);
-typedef AmlgLoadEntityStatus (*AmlgLoadEntityFn)(char *, char *, char *, bool, char *, char *, char *,
-                                                 const char **, size_t);
-typedef AmlgLoadEntityStatus (*AmlgLoadEntityFromMemoryFn)(char *, void *, size_t, char *, bool, char *, char *,
-                                                           char *, const char **, size_t);
-typedef AmlgLoadEntityStatus (*AmlgVerifyEntityFn)(char *);
-typedef char *(*AmlgStringOfStringFn)(char *);
-typedef bool (*AmlgBoolOfTwoStringsFn)(char *, char *);
-typedef bool (*AmlgCloneEntityFn)(char *, char *, char *, char *, bool, char *, char *, char *);
-typedef bool (*AmlgStoreEntityFn)(char *, char *, char *, bool, char *, const char **, size_t);
-typedef bool (*AmlgStoreEntityToMemoryFn)(char *, void **, size_t *, char *, bool, char *, const char **, size_t);
-typedef void (*AmlgVoidOfStringFn)(char *);
-typedef char **(*AmlgGetEntitiesFn)(uint64_t *);
-typedef void (*AmlgVoidOfThreeStringsFn)(char *, char *, char *);
-typedef char *(*AmlgStringOfTwoStringsFn)(char *, char *);
-typedef char *(*AmlgStringOfThreeStringsFn)(char *, char *, char *);
-typedef AmlgResultWithLog (*AmlgExecuteLoggedFn)(char *, char *, char *);
-typedef char *(*AmlgStringFn)(void);
-typedef void (*AmlgVoidOfBoolFn)(bool);
-typedef bool (*AmlgBoolFn)(void);
-typedef size_t (*AmlgSizeFn)(void);
-typedef void (*AmlgVoidOfSizeFn)(size_t);
+/* One function pointer type per engine entry point, named after the entry point. */
+typedef void (*DeleteStringFunc)(char *);
+typedef AmlgLoadEntityStatus (*LoadEntityFunc)(char *, char *, char *, bool, char *, char *, char *,
+                                               const char **, size_t);
+typedef AmlgLoadEntityStatus (*LoadEntityFromMemoryFunc)(char *, void *, size_t, char *, bool, char *, char *,
+                                                         char *, const char **, size_t);
+typedef AmlgLoadEntityStatus (*VerifyEntityFunc)(char *);
+typedef char *(*GetEntityPermissionsFunc)(char *);
+typedef bool (*SetEntityPermissionsFunc)(char *, char *);
+typedef bool (*CloneEntityFunc)(char *, char *, char *, char *, bool, char *, char *, char *);
+typedef bool (*StoreEntityFunc)(char *, char *, char *, bool, char *, const char **, size_t);
+typedef bool (*StoreEntityToMemoryFunc)(char *, void **, size_t *, char *, bool, char *, const char **, size_t);
+typedef void (*DestroyEntityFunc)(char *);
+typedef bool (*SetRandomSeedFunc)(char *, char *);
+typedef char **(*GetEntitiesFunc)(uint64_t *);
+typedef void (*SetJSONToLabelFunc)(char *, char *, char *);
+typedef char *(*GetJSONPtrFromLabelFunc)(char *, char *);
+typedef char *(*ExecuteEntityJsonPtrFunc)(char *, char *, char *);
+typedef AmlgResultWithLog (*ExecuteEntityJsonPtrLoggedFunc)(char *, char *, char *);
+typedef char *(*EvalOnEntityFunc)(char *, char *);
+typedef char *(*GetVersionStringFunc)(void);
+typedef char *(*GetConcurrencyTypeStringFunc)(void);
+typedef void (*SetSBFDataStoreEnabledFunc)(bool);
+typedef bool (*IsSBFDataStoreEnabledFunc)(void);
+typedef size_t (*GetMaxNumThreadsFunc)(void);
+typedef void (*SetMaxNumThreadsFunc)(size_t);
+typedef size_t (*GetNumActiveThreadsFunc)(void);
+typedef char *(*GetGarbageCollectionParamsFunc)(void);
+typedef void (*SetGarbageCollectionParamsFunc)(char *);
 
-/* X(entry point name, function pointer type) for every wrapped entry point; the order defines ENTRY_POINTS. */
-#define AMLG_ENTRY_POINTS(X)                                     \
-    X(DeleteString, AmlgDeleteStringFn)                          \
-    X(LoadEntity, AmlgLoadEntityFn)                              \
-    X(LoadEntityFromMemory, AmlgLoadEntityFromMemoryFn)          \
-    X(VerifyEntity, AmlgVerifyEntityFn)                          \
-    X(GetEntityPermissions, AmlgStringOfStringFn)                \
-    X(SetEntityPermissions, AmlgBoolOfTwoStringsFn)              \
-    X(CloneEntity, AmlgCloneEntityFn)                            \
-    X(StoreEntity, AmlgStoreEntityFn)                            \
-    X(StoreEntityToMemory, AmlgStoreEntityToMemoryFn)            \
-    X(DestroyEntity, AmlgVoidOfStringFn)                         \
-    X(SetRandomSeed, AmlgBoolOfTwoStringsFn)                     \
-    X(GetEntities, AmlgGetEntitiesFn)                            \
-    X(SetJSONToLabel, AmlgVoidOfThreeStringsFn)                  \
-    X(GetJSONPtrFromLabel, AmlgStringOfTwoStringsFn)             \
-    X(ExecuteEntityJsonPtr, AmlgStringOfThreeStringsFn)          \
-    X(ExecuteEntityJsonPtrLogged, AmlgExecuteLoggedFn)           \
-    X(EvalOnEntity, AmlgStringOfTwoStringsFn)                    \
-    X(GetVersionString, AmlgStringFn)                            \
-    X(GetConcurrencyTypeString, AmlgStringFn)                    \
-    X(SetSBFDataStoreEnabled, AmlgVoidOfBoolFn)                  \
-    X(IsSBFDataStoreEnabled, AmlgBoolFn)                         \
-    X(GetMaxNumThreads, AmlgSizeFn)                              \
-    X(SetMaxNumThreads, AmlgVoidOfSizeFn)                        \
-    X(GetNumActiveThreads, AmlgSizeFn)                           \
-    X(GetGarbageCollectionParams, AmlgStringFn)                  \
-    X(SetGarbageCollectionParams, AmlgVoidOfStringFn)
-
+/*
+ * The enum, the AmlgFunctions fields, entry_point_names, and the assignments in Library_new list the entry
+ * points in the same order; that order is ENTRY_POINTS, the order of the addresses amalgam._native passes in.
+ */
 enum {
-#define AMLG_INDEX(name, type) AMLG_INDEX_##name,
-    AMLG_ENTRY_POINTS(AMLG_INDEX)
-#undef AMLG_INDEX
+    AMLG_INDEX_DeleteString,
+    AMLG_INDEX_LoadEntity,
+    AMLG_INDEX_LoadEntityFromMemory,
+    AMLG_INDEX_VerifyEntity,
+    AMLG_INDEX_GetEntityPermissions,
+    AMLG_INDEX_SetEntityPermissions,
+    AMLG_INDEX_CloneEntity,
+    AMLG_INDEX_StoreEntity,
+    AMLG_INDEX_StoreEntityToMemory,
+    AMLG_INDEX_DestroyEntity,
+    AMLG_INDEX_SetRandomSeed,
+    AMLG_INDEX_GetEntities,
+    AMLG_INDEX_SetJSONToLabel,
+    AMLG_INDEX_GetJSONPtrFromLabel,
+    AMLG_INDEX_ExecuteEntityJsonPtr,
+    AMLG_INDEX_ExecuteEntityJsonPtrLogged,
+    AMLG_INDEX_EvalOnEntity,
+    AMLG_INDEX_GetVersionString,
+    AMLG_INDEX_GetConcurrencyTypeString,
+    AMLG_INDEX_SetSBFDataStoreEnabled,
+    AMLG_INDEX_IsSBFDataStoreEnabled,
+    AMLG_INDEX_GetMaxNumThreads,
+    AMLG_INDEX_SetMaxNumThreads,
+    AMLG_INDEX_GetNumActiveThreads,
+    AMLG_INDEX_GetGarbageCollectionParams,
+    AMLG_INDEX_SetGarbageCollectionParams,
     AMLG_ENTRY_POINT_COUNT
 };
 
 typedef struct {
-#define AMLG_FIELD(name, type) type name;
-    AMLG_ENTRY_POINTS(AMLG_FIELD)
-#undef AMLG_FIELD
+    DeleteStringFunc DeleteString;
+    LoadEntityFunc LoadEntity;
+    LoadEntityFromMemoryFunc LoadEntityFromMemory;
+    VerifyEntityFunc VerifyEntity;
+    GetEntityPermissionsFunc GetEntityPermissions;
+    SetEntityPermissionsFunc SetEntityPermissions;
+    CloneEntityFunc CloneEntity;
+    StoreEntityFunc StoreEntity;
+    StoreEntityToMemoryFunc StoreEntityToMemory;
+    DestroyEntityFunc DestroyEntity;
+    SetRandomSeedFunc SetRandomSeed;
+    GetEntitiesFunc GetEntities;
+    SetJSONToLabelFunc SetJSONToLabel;
+    GetJSONPtrFromLabelFunc GetJSONPtrFromLabel;
+    ExecuteEntityJsonPtrFunc ExecuteEntityJsonPtr;
+    ExecuteEntityJsonPtrLoggedFunc ExecuteEntityJsonPtrLogged;
+    EvalOnEntityFunc EvalOnEntity;
+    GetVersionStringFunc GetVersionString;
+    GetConcurrencyTypeStringFunc GetConcurrencyTypeString;
+    SetSBFDataStoreEnabledFunc SetSBFDataStoreEnabled;
+    IsSBFDataStoreEnabledFunc IsSBFDataStoreEnabled;
+    GetMaxNumThreadsFunc GetMaxNumThreads;
+    SetMaxNumThreadsFunc SetMaxNumThreads;
+    GetNumActiveThreadsFunc GetNumActiveThreads;
+    GetGarbageCollectionParamsFunc GetGarbageCollectionParams;
+    SetGarbageCollectionParamsFunc SetGarbageCollectionParams;
 } AmlgFunctions;
 
-static const char *const entry_point_names[AMLG_ENTRY_POINT_COUNT] = {
-#define AMLG_NAME(name, type) #name,
-    AMLG_ENTRY_POINTS(AMLG_NAME)
-#undef AMLG_NAME
+static const char *const entry_point_names[] = {
+    "DeleteString",
+    "LoadEntity",
+    "LoadEntityFromMemory",
+    "VerifyEntity",
+    "GetEntityPermissions",
+    "SetEntityPermissions",
+    "CloneEntity",
+    "StoreEntity",
+    "StoreEntityToMemory",
+    "DestroyEntity",
+    "SetRandomSeed",
+    "GetEntities",
+    "SetJSONToLabel",
+    "GetJSONPtrFromLabel",
+    "ExecuteEntityJsonPtr",
+    "ExecuteEntityJsonPtrLogged",
+    "EvalOnEntity",
+    "GetVersionString",
+    "GetConcurrencyTypeString",
+    "SetSBFDataStoreEnabled",
+    "IsSBFDataStoreEnabled",
+    "GetMaxNumThreads",
+    "SetMaxNumThreads",
+    "GetNumActiveThreads",
+    "GetGarbageCollectionParams",
+    "SetGarbageCollectionParams",
 };
+
+/* A negative array size is a compile error in every C dialect, including MSVC without /std:c11. */
+typedef char entry_point_names_match_enum[
+    (sizeof(entry_point_names) / sizeof(entry_point_names[0]) == AMLG_ENTRY_POINT_COUNT) ? 1 : -1];
 
 typedef struct {
     PyObject_HEAD
@@ -308,9 +363,35 @@ Library_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
     self->owner = Py_NewRef(owner);
-#define AMLG_ASSIGN(name, type) self->fn.name = (type)pointers[AMLG_INDEX_##name];
-    AMLG_ENTRY_POINTS(AMLG_ASSIGN)
-#undef AMLG_ASSIGN
+    self->fn.DeleteString = (DeleteStringFunc)pointers[AMLG_INDEX_DeleteString];
+    self->fn.LoadEntity = (LoadEntityFunc)pointers[AMLG_INDEX_LoadEntity];
+    self->fn.LoadEntityFromMemory = (LoadEntityFromMemoryFunc)pointers[AMLG_INDEX_LoadEntityFromMemory];
+    self->fn.VerifyEntity = (VerifyEntityFunc)pointers[AMLG_INDEX_VerifyEntity];
+    self->fn.GetEntityPermissions = (GetEntityPermissionsFunc)pointers[AMLG_INDEX_GetEntityPermissions];
+    self->fn.SetEntityPermissions = (SetEntityPermissionsFunc)pointers[AMLG_INDEX_SetEntityPermissions];
+    self->fn.CloneEntity = (CloneEntityFunc)pointers[AMLG_INDEX_CloneEntity];
+    self->fn.StoreEntity = (StoreEntityFunc)pointers[AMLG_INDEX_StoreEntity];
+    self->fn.StoreEntityToMemory = (StoreEntityToMemoryFunc)pointers[AMLG_INDEX_StoreEntityToMemory];
+    self->fn.DestroyEntity = (DestroyEntityFunc)pointers[AMLG_INDEX_DestroyEntity];
+    self->fn.SetRandomSeed = (SetRandomSeedFunc)pointers[AMLG_INDEX_SetRandomSeed];
+    self->fn.GetEntities = (GetEntitiesFunc)pointers[AMLG_INDEX_GetEntities];
+    self->fn.SetJSONToLabel = (SetJSONToLabelFunc)pointers[AMLG_INDEX_SetJSONToLabel];
+    self->fn.GetJSONPtrFromLabel = (GetJSONPtrFromLabelFunc)pointers[AMLG_INDEX_GetJSONPtrFromLabel];
+    self->fn.ExecuteEntityJsonPtr = (ExecuteEntityJsonPtrFunc)pointers[AMLG_INDEX_ExecuteEntityJsonPtr];
+    self->fn.ExecuteEntityJsonPtrLogged =
+        (ExecuteEntityJsonPtrLoggedFunc)pointers[AMLG_INDEX_ExecuteEntityJsonPtrLogged];
+    self->fn.EvalOnEntity = (EvalOnEntityFunc)pointers[AMLG_INDEX_EvalOnEntity];
+    self->fn.GetVersionString = (GetVersionStringFunc)pointers[AMLG_INDEX_GetVersionString];
+    self->fn.GetConcurrencyTypeString = (GetConcurrencyTypeStringFunc)pointers[AMLG_INDEX_GetConcurrencyTypeString];
+    self->fn.SetSBFDataStoreEnabled = (SetSBFDataStoreEnabledFunc)pointers[AMLG_INDEX_SetSBFDataStoreEnabled];
+    self->fn.IsSBFDataStoreEnabled = (IsSBFDataStoreEnabledFunc)pointers[AMLG_INDEX_IsSBFDataStoreEnabled];
+    self->fn.GetMaxNumThreads = (GetMaxNumThreadsFunc)pointers[AMLG_INDEX_GetMaxNumThreads];
+    self->fn.SetMaxNumThreads = (SetMaxNumThreadsFunc)pointers[AMLG_INDEX_SetMaxNumThreads];
+    self->fn.GetNumActiveThreads = (GetNumActiveThreadsFunc)pointers[AMLG_INDEX_GetNumActiveThreads];
+    self->fn.GetGarbageCollectionParams =
+        (GetGarbageCollectionParamsFunc)pointers[AMLG_INDEX_GetGarbageCollectionParams];
+    self->fn.SetGarbageCollectionParams =
+        (SetGarbageCollectionParamsFunc)pointers[AMLG_INDEX_SetGarbageCollectionParams];
     return (PyObject *)self;
 }
 
