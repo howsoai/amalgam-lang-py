@@ -46,8 +46,8 @@ jobs:
       optional-release-tag: ${{ inputs.optional-release-tag }}
       amalgam-build: ${{ inputs.amalgam-build }}
 
-  build:
-    name: Build (${{ matrix.plat }})
+  fetch-engine:
+    name: Fetch engine (${{ matrix.plat }})
     needs: ["metadata"]
     runs-on: ubuntu-latest
     strategy:
@@ -57,18 +57,6 @@ jobs:
     steps:
 
     - uses: actions/checkout@v6
-
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: "3.13"
-
-    - name: Install cibuildwheel
-      run: >-
-        python3 -m
-        pip install
-        cibuildwheel==2.15.0
-        build
 
     - name: Download Amalgam linux-amd64
       if: matrix.plat == 'manylinux_2_29_x86_64' || matrix.plat == 'any'
@@ -182,23 +170,160 @@ jobs:
         jq --arg build_title "$build_title" '.version |= . + {"amalgam_display_title": $build_title}' version.json > temp.json && mv temp.json version.json
         cat version.json
 
-    - name: Build wheels
-      run: |
-        python3 -m build --wheel --outdir wheelhouse/ .
-        mkdir -p dist/
-        mv wheelhouse/*.whl dist/amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}.whl
-      env:
-        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
+    - name: Remove downloaded archives
+      run: find amalgam/lib -name '*.tar.gz' -delete
 
-    - name: Build tarball
-      if: matrix.plat == 'any'
-      run: |
-        python3 -m build --sdist --outdir dist/ .
+    - name: Upload engine libraries
+      uses: actions/upload-artifact@v7
+      with:
+        name: engine-lib-${{ matrix.plat }}
+        path: amalgam/lib
+        if-no-files-found: error
+
+  build:
+    name: Build (${{ matrix.plat }})
+    needs: ["metadata", "fetch-engine"]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - plat: manylinux_2_28_x86_64
+            runner: ubuntu-latest
+            archs: x86_64
+            test-command: python -c "import amalgam._api" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test
+          - plat: manylinux_2_29_x86_64
+            runner: ubuntu-latest
+            archs: x86_64
+            # The glibc 2.29 engine libraries cannot load in the glibc 2.28 build container.
+            test-command: python -c "import amalgam._api, amalgam.api"
+          - plat: manylinux_2_29_aarch64
+            runner: ubuntu-24.04-arm
+            archs: aarch64
+            test-command: python -c "import amalgam._api, amalgam.api"
+          - plat: macosx_12_0_arm64
+            runner: macos-14
+            archs: arm64
+            test-command: python -c "import amalgam._api" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test
+          - plat: win_amd64
+            runner: windows-latest
+            archs: AMD64
+            test-command: python -c "import amalgam._api" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test
+
+    steps:
+
+    - uses: actions/checkout@v6
+
+    - name: Download engine libraries
+      uses: actions/download-artifact@v8
+      with:
+        name: engine-lib-${{ matrix.plat }}
+        path: amalgam/lib
+
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v4.3.1
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
+        CIBW_ARCHS: ${{ matrix.archs }}
+        CIBW_TEST_COMMAND: ${{ matrix.test-command }}
+      with:
+        output-dir: wheelhouse
+
+    - name: Set up Python
+      if: runner.os == 'Linux'
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+
+    - name: Tag Linux wheel as manylinux
+      if: runner.os == 'Linux'
+      run: |
+        python3 -m pip install wheel
+        python3 -m wheel tags --remove --platform-tag ${{ matrix.plat }} wheelhouse/*.whl
+
+    - name: Check wheel name
+      run: |
+        ls wheelhouse
+        test "$(ls wheelhouse/*.whl | wc -l)" -eq 1
+        ls wheelhouse/*-cp311-abi3-${{ matrix.plat }}.whl
+
+    - name: Upload Wheel Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: amalgam_lang-${{ needs.metadata.outputs.version }}-${{ matrix.plat }}
+        path: wheelhouse/*.whl
+        if-no-files-found: error
+
+  pytest-linux-3-13t-mt:
+    name: Pytest (Linux, Python 3.13t, MT, source build)
+    needs: ["metadata", "fetch-engine"]
+    runs-on: ubuntu-latest
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
+      AMALGAM_LIBRARY_POSTFIX: "-mt"
+      AMALGAM_PY_BACKEND: "c"
+    steps:
+
+    - uses: actions/checkout@v6
+
+    - name: Set up free-threaded Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13t"
+
+    - name: Download engine libraries
+      uses: actions/download-artifact@v8
+      with:
+        name: engine-lib-manylinux_2_29_x86_64
+        path: amalgam/lib
+
+    - name: Build C extension from source
+      run: python -m pip install -e . pytest pytest-mock
+
+    - name: Verify free-threaded import and run tests
+      run: |
+        python - <<'PY'
+        import sys
+        import sysconfig
+        assert sysconfig.get_config_var("Py_GIL_DISABLED") == 1
+        import amalgam._api
+        assert not sys._is_gil_enabled()
+        PY
+        test -f amalgam/lib/linux/amd64/amalgam-mt.so
+        python -m pytest --require-c-extension --import-mode=importlib -p no:cacheprovider amalgam/test
+
+  build-pure:
+    name: Build (any)
+    needs: ["metadata", "fetch-engine"]
+    runs-on: ubuntu-latest
+    env:
+      SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.metadata.outputs.version }}
+    steps:
+
+    - uses: actions/checkout@v6
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+
+    - name: Download engine libraries
+      uses: actions/download-artifact@v8
+      with:
+        name: engine-lib-any
+        path: amalgam/lib
+
+    - name: Build sdist
+      run: |
+        python3 -m pip install build
+        python3 -m build --sdist --outdir dist/ .
+
+    - name: Build pure wheel
+      run: |
+        python3 bin/remove_extension_modules.py pyproject.toml
+        python3 -m build --wheel --outdir dist/ .
+        ls dist/*-py3-none-any.whl
 
     - name: Upload Tarball Artifact
-      if: matrix.plat == 'any'
       uses: actions/upload-artifact@v7
       with:
         name: amalgam_lang-${{ needs.metadata.outputs.version }}
@@ -208,19 +333,19 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v7
       with:
-        name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-${{ matrix.plat }}
+        name: amalgam_lang-${{ needs.metadata.outputs.version }}-py3-none-any
         path: dist/amalgam_lang-*.whl
         if-no-files-found: error
 
   workflow-summary:
-    needs: ['metadata', 'build']
+    needs: ['metadata', 'build', 'build-pure', 'pytest-linux-3-13t-mt']
     uses: "howsoai/.github/.github/workflows/workflow-summary.yml@main"
     secrets: inherit
     with:
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
 
   pytest-linux-3-11-st:
-    needs: ['metadata', 'build']
+    needs: ['metadata', 'build', 'build-pure']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
@@ -235,7 +360,7 @@ jobs:
       debug: ${{ inputs.debug-mode }}
 
   pytest-linux-3-14-mt:
-    needs: ['metadata', 'build']
+    needs: ['metadata', 'build', 'build-pure']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
@@ -249,7 +374,7 @@ jobs:
       debug: ${{ inputs.debug-mode }}
 
   pytest-windows-3-13-mt:
-    needs: ['metadata', 'build']
+    needs: ['metadata', 'build', 'build-pure']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
@@ -263,7 +388,7 @@ jobs:
       debug: ${{ inputs.debug-mode }}
 
   pytest-macos-3-12-mt:
-    needs: ['metadata', 'build']
+    needs: ['metadata', 'build', 'build-pure']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
     secrets: inherit
     with:
@@ -295,6 +420,7 @@ jobs:
     - name: Download Artifacts
       uses: actions/download-artifact@v8
       with:
+        pattern: amalgam_lang-*
         path: ./tmp
 
     - name: Configure environment
@@ -372,6 +498,7 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v8
         with:
+          pattern: amalgam_lang-*
           path: ./tmp
 
       - name: Clean up dir

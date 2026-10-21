@@ -6,3 +6,4 @@ global-include *.dylib
 global-include *.dll
 global-exclude *.py[co]
 prune **/test
+global-exclude _api*.so _api*.pyd
