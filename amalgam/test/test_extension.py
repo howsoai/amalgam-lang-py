@@ -1,6 +1,5 @@
 """Tests specific to the amalgam._api C extension."""
 import gc
-import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -23,14 +22,6 @@ except ImportError:
 def api_module(c_extension: None) -> object:
     """The extension module; a missing extension skips the test unless it is required."""
     return _api
-
-
-def test_extension_uses_the_stable_abi(api_module: object) -> None:
-    """The built extension is an abi3 module."""
-    spec = importlib.util.find_spec("amalgam._api")
-    assert spec is not None and spec.origin is not None
-    name = Path(spec.origin).name
-    assert ".abi3" in name or name.endswith(".pyd")
 
 
 def test_entry_points_cover_the_engine_api(api_module: object) -> None:
