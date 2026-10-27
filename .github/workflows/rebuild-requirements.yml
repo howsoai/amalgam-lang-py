@@ -64,6 +64,7 @@ jobs:
       branch: ${{ needs.gen-branch-name.outputs.branch }}
       force-rebuild: true
       extras: "dev"
+      python-versions: "3.11 3.12 3.13 3.14 3.15"
 
   gen-pr-title:
     if: inputs.create-pr == true
