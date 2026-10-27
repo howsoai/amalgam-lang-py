@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --cert=None --client-cert=None --extra=dev --index-url=None --no-emit-index-url --no-index --output-file=requirements-3.11-dev.txt --pip-args=None
 #
-coverage[toml]==7.16.2
+coverage[toml]==7.17.0
     # via pytest-cov
 execnet==2.1.2
     # via pytest-xdist
@@ -44,7 +44,7 @@ pytest==9.1.1
     #   pytest-xdist
 pytest-cov==7.1.0
     # via amalgam-lang (pyproject.toml)
-pytest-mock==3.16.0
+pytest-mock==3.17.0
     # via amalgam-lang (pyproject.toml)
 pytest-xdist==3.8.0
     # via amalgam-lang (pyproject.toml)
@@ -52,5 +52,5 @@ snowballstemmer==3.1.1
     # via pydocstyle
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==84.0.0
+setuptools==84.2.1
     # via flake8-import-order
