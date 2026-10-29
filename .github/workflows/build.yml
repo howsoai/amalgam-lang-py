@@ -373,6 +373,20 @@ jobs:
       upstream-details: ${{ needs.metadata.outputs.upstream-details }}
       debug: ${{ inputs.debug-mode }}
 
+  pytest-linux-3-15-mt:
+    needs: ['metadata', 'build', 'build-pure']
+    uses: howsoai/.github/.github/workflows/pytest.yml@main
+    secrets: inherit
+    with:
+      platform: 'ubuntu-latest'
+      platform-pretty: 'Linux'
+      amalgam-plat-arch: 'linux-amd64'
+      python-version: '3.15'
+      config-fp: './config/latest-mt-traces-howso.yml'
+      config-pretty: 'MT'
+      upstream-details: ${{ needs.metadata.outputs.upstream-details }}
+      debug: ${{ inputs.debug-mode }}
+
   pytest-windows-3-13-mt:
     needs: ['metadata', 'build', 'build-pure']
     uses: howsoai/.github/.github/workflows/pytest.yml@main
@@ -408,6 +422,7 @@ jobs:
       - workflow-summary
       - pytest-linux-3-11-st
       - pytest-linux-3-14-mt
+      - pytest-linux-3-15-mt
       - pytest-macos-3-12-mt
       - pytest-windows-3-13-mt
     runs-on: ubuntu-latest
@@ -475,6 +490,7 @@ jobs:
       - workflow-summary
       - pytest-linux-3-11-st
       - pytest-linux-3-14-mt
+      - pytest-linux-3-15-mt
       - pytest-macos-3-12-mt
       - pytest-windows-3-13-mt
       - publish

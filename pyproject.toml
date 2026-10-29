@@ -24,6 +24,7 @@ classifiers = [
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
+        "Programming Language :: Python :: 3.15",
         "Operating System :: MacOS",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows",
@@ -87,7 +88,7 @@ split_penalty_for_added_line_split = 300
 [tool.setuptools_scm]
 
 [tool.cibuildwheel]
-build = "cp311-* cp312-* cp313-* cp314-*"
+build = "cp311-* cp312-* cp313-* cp314-* cp315-*"
 skip = "*-musllinux_* *t-*"
 build-frontend = "build"
 # Tags the cp311 build as cp311-abi3; only cibuildwheel's (never free-threaded) builds apply it.
