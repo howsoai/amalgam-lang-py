@@ -201,7 +201,7 @@ jobs:
             archs: aarch64
             test-command: python -c "import amalgam._api, amalgam.api"
           - plat: macosx_12_0_arm64
-            runner: macos-14
+            runner: macos-15
             archs: arm64
             test-command: python -c "import amalgam._api" && pytest --require-c-extension --import-mode=importlib -p no:cacheprovider {project}/amalgam/test
           - plat: win_amd64
