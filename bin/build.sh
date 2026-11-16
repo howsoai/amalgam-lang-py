@@ -4,7 +4,7 @@ set -eux
 # Install dependencies
 install_deps() {
   python --version
-  python -m pip install -r requirements-${1}-dev.txt --user --no-deps
+  python -m pip install -r pylock.toml
   python -m pip install --no-deps -e .
 }
 
